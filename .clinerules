@@ -96,6 +96,17 @@ Idle Priority (0): IDLE tasks (system)
 
 ## Evolution of Project Decisions
 
+### Web Server Architecture Decision (January 28, 2025)
+**Initial Plan**: ESPAsyncWebServer (third-party library)
+**Final Decision**: ESP-IDF HTTP Server (official Espressif component)
+**Rationale**: 
+- Official support and long-term maintenance from Espressif
+- Better integration with ESP-IDF ecosystem and event system
+- Comprehensive documentation and proven reliability in production
+- Native WebSocket support and advanced HTTP features
+- Alignment with ESP-IDF best practices and examples
+**Impact**: Complete revision of Step 2 implementation approach in webServerImplementationPlan.md
+
 ### Initial Approach vs Current Implementation
 **Initial**: Simple printf debugging
 **Current**: Comprehensive monitoring system with configurable output

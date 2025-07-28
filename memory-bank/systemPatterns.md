@@ -137,15 +137,38 @@ debug_config.h
 1. Initialize monitoring systems (memory_monitor_init, task_tracker_init)
 2. Start monitoring tasks (memory_monitor_start, task_tracker_start)
 3. Register callbacks for task lifecycle events
-4. System ready for irrigation control implementation (demo tasks removed)
+4. System ready for web server implementation (following webServerImplementationPlan.md)
 ```
 
-### 2. Periodic Reporting
+### 2. ESP-IDF HTTP Server Integration Pattern
+**REFERENCE**: `memory-bank/webServerImplementationPlan.md` for detailed architecture
+
+**ESP-IDF HTTP Server Architecture**:
+- WebServerManager using `esp_http_server.h` component
+- URI handlers registered with `httpd_register_uri_handler()`
+- Event system integration with `ESP_HTTP_SERVER_EVENT`
+- Configuration using `httpd_config_t` structure
+- Integration with existing monitoring systems
+
+**Request Flow Pattern**:
+```
+HTTP Request → ESP-IDF HTTP Server → URI Handler → Controller → Manager → HTTP Response
+```
+
+**ESP-IDF Integration Points**:
+- Server lifecycle events logged through ESP-IDF event system
+- Task monitoring integration (server runs in dedicated task)
+- Memory monitoring of HTTP server heap usage
+- Configuration following ESP-IDF best practices
+
+### 3. Periodic Reporting
 - Automatic reports based on configurable intervals
 - Manual report triggering for debugging
 - Multiple report formats (summary, detailed, analysis)
+- Web API endpoints for real-time monitoring data
 
-### 3. Callback Integration
+### 4. Callback Integration
 - Task creation/deletion callbacks for lifecycle tracking
 - Memory threshold callbacks for leak detection
 - Stack warning callbacks for overflow prevention
+- Web server task integration with existing monitoring

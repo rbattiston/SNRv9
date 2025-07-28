@@ -235,12 +235,19 @@ void task_tracker_print_detailed_report(void);
 void task_tracker_print_summary(void);
 
 /**
+ * @brief Check for stack usage warnings
+ * 
+ * Checks all tasks for stack usage warnings and outputs alerts
+ * for tasks approaching stack limits.
+ */
+void task_tracker_check_stack_warnings(void);
+
+/**
  * @brief Print stack usage analysis to console
  * 
  * Outputs detailed stack usage analysis including warnings
  * for tasks approaching stack limits.
  */
-void task_tracker_check_stack_warnings(void);
 void task_tracker_print_stack_analysis(void);
 
 /**

@@ -7,6 +7,17 @@
 
 ## Recent Accomplishments
 
+### ✅ Web Server Architecture Decision
+**Decision**: Adopt ESP-IDF HTTP Server over ESPAsyncWebServer
+**Date**: January 28, 2025
+**Rationale**: 
+- Official Espressif component with long-term support
+- Better integration with ESP-IDF ecosystem and event system
+- Comprehensive documentation and proven reliability
+- Native WebSocket support and advanced features
+- Alignment with ESP-IDF best practices
+**Impact**: Step 2 implementation plan completely revised to use `esp_http_server.h`
+
 ### ✅ Stack Overflow Issue Resolution
 **Problem**: Demo tasks were experiencing stack overflow causing system crashes and reboots
 **Root Cause**: Insufficient stack allocation (1536/1024 bytes) for demo tasks
@@ -110,22 +121,36 @@
 ## Next Steps and Future Work
 
 ### Immediate Priorities (Next Session)
-1. **Irrigation Control Implementation**: Begin implementing relay/solenoid control
-2. **Sensor Integration**: Add support for soil moisture and environmental sensors
-3. **Web Server Foundation**: Implement basic HTTP server for remote monitoring
-4. **Data Storage**: Add persistent storage for historical data and configuration
+**REFERENCE**: Follow `memory-bank/webServerImplementationPlan.md` for detailed implementation roadmap
 
-### Medium-term Goals
-1. **Advanced Monitoring**: Extend monitoring to include sensor data and irrigation events
-2. **User Interface**: Develop web-based control interface
-3. **Data Analytics**: Implement trending and analysis capabilities
-4. **Configuration Management**: Add runtime configuration via web interface
+1. **Step 1 - WiFi Foundation**: Implement WiFiHandler/WiFiManager
+   - Basic WiFi connection management with auto-reconnection
+   - Connection status monitoring and integration with existing monitoring
+   - Foundation for all subsequent web functionality
+   
+2. **Step 2 - Basic HTTP Server**: Implement WebServerManager (minimal version)
+   - Initialize ESPAsyncWebServer on port 80
+   - Basic "Hello World" endpoint for testing
+   - Integration with existing task monitoring
 
-### Long-term Vision
-1. **Commercial Deployment**: Production-ready irrigation control system
-2. **Scalability**: Support for multiple zones and complex irrigation schedules
-3. **Integration**: API support for external systems and IoT platforms
-4. **Maintenance**: Remote diagnostics and over-the-air updates
+3. **Step 3 - Static File Controller**: Basic web interface foundation
+   - Serve HTML/CSS/JS files with proper caching
+   - MIME type support and performance optimization
+
+### Medium-term Goals (Steps 4-8)
+**REFERENCE**: See `memory-bank/webServerImplementationPlan.md` for complete details
+
+1. **Authentication Foundation**: Session-based auth with role-based access control
+2. **System Monitoring Web Interface**: Real-time dashboard and system status APIs
+3. **Configuration Management**: Web-based configuration with persistent storage
+4. **Request Priority Management**: Load balancing and watchdog timeout prevention
+5. **Storage Foundation**: SPIFFS/LittleFS for data persistence
+
+### Long-term Vision (Steps 9-12)
+1. **Event Logging System**: Web-based log viewing with raw file serving
+2. **Dashboard Controller**: Real-time monitoring with client-side processing
+3. **Basic I/O Framework**: Hardware abstraction for irrigation control
+4. **User Management**: Complete RBAC system with web interface
 
 ## Key Learnings
 

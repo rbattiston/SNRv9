@@ -73,45 +73,55 @@
 
 ## What's Left to Build 🚧
 
-### Phase 2: Irrigation Control Core
-**Priority**: High
-**Components Needed**:
-- **GPIO Control Module**: Digital output control for relays/solenoids
-- **Relay Driver Interface**: Safe relay switching with protection circuits
-- **Zone Management**: Multiple irrigation zone control and scheduling
-- **Safety Interlocks**: Prevent simultaneous zone activation, flow monitoring
+**REFERENCE**: Follow detailed implementation plan in `memory-bank/webServerImplementationPlan.md`
 
-### Phase 3: Sensor Integration
-**Priority**: High
-**Components Needed**:
-- **ADC Interface**: Analog sensor reading (soil moisture, temperature)
-- **Digital Sensor Support**: I2C/SPI sensor communication
-- **Sensor Calibration**: Calibration data storage and application
-- **Data Validation**: Sensor fault detection and error handling
+### Phase 2: ESP32 Web Server Architecture (Steps 1-12)
+**Priority**: High - Foundation for all remote control and monitoring
+**Implementation Plan**: 12-step incremental approach
 
-### Phase 4: Web Server and Remote Access
+**Critical Foundation (Steps 1-3)**:
+- **Step 1**: WiFi Foundation - Connection management and monitoring integration
+- **Step 2**: Basic HTTP Server - ESPAsyncWebServer with monitoring integration
+- **Step 3**: Static File Controller - Web interface foundation with caching
+
+**Core Web Services (Steps 4-6)**:
+- **Step 4**: Authentication Foundation - Session-based auth with RBAC
+- **Step 5**: System Monitoring Web Interface - Real-time dashboard APIs
+- **Step 6**: Configuration Management - Web-based settings with persistence
+
+**Performance & Storage (Steps 7-8)**:
+- **Step 7**: Request Priority Management - Load balancing and timeout prevention
+- **Step 8**: Storage Foundation - SPIFFS/LittleFS for data persistence
+
+**Advanced Features (Steps 9-12)**:
+- **Step 9**: Event Logging System - Web-based log viewing
+- **Step 10**: Dashboard Controller - Real-time monitoring with client-side processing
+- **Step 11**: Basic I/O Framework - Hardware abstraction for irrigation control
+- **Step 12**: User Management - Complete RBAC system
+
+### Phase 3: Irrigation Control Integration
+**Priority**: Medium (after web server foundation)
+**Components Needed**:
+- **GPIO Control Module**: Integration with Step 11 I/O Framework
+- **Relay Driver Interface**: Safe relay switching with web control
+- **Zone Management**: Web-based irrigation zone control and scheduling
+- **Safety Interlocks**: Web-configurable safety systems
+
+### Phase 4: Sensor Integration
 **Priority**: Medium
 **Components Needed**:
-- **HTTP Server**: ESP-IDF HTTP server implementation
-- **WiFi Management**: Connection management and reconnection logic
-- **Web Interface**: HTML/CSS/JavaScript control interface
-- **API Endpoints**: RESTful API for system control and monitoring
+- **ADC Interface**: Sensor reading with web dashboard integration
+- **Digital Sensor Support**: I2C/SPI with web configuration
+- **Sensor Calibration**: Web-based calibration interface
+- **Data Validation**: Web-visible fault detection and alerts
 
-### Phase 5: Data Storage and Trending
-**Priority**: Medium
-**Components Needed**:
-- **Flash Storage**: Non-volatile data storage using SPIFFS/LittleFS
-- **Data Logging**: Historical sensor data and irrigation events
-- **Trending Engine**: Data analysis and trend calculation
-- **Configuration Storage**: Persistent system configuration
-
-### Phase 6: Advanced Features
+### Phase 5: Advanced Analytics and Automation
 **Priority**: Low
 **Components Needed**:
-- **Scheduling Engine**: Complex irrigation scheduling algorithms
-- **Weather Integration**: External weather data integration
-- **Mobile App Support**: Mobile application interface
-- **OTA Updates**: Over-the-air firmware update capability
+- **Trending Engine**: Client-side data analysis (following architecture pattern)
+- **Scheduling Engine**: Web-based irrigation scheduling
+- **Weather Integration**: External API integration via web interface
+- **Mobile App Support**: API foundation already established by web server
 
 ## Known Issues 🔧
 
@@ -153,24 +163,38 @@
    - System optimized and ready for irrigation control implementation
    - Build verification completed successfully
 
+3. **Web Server Implementation Plan** (January 28, 2025)
+   - Comprehensive 12-step implementation roadmap created
+   - Controller-based architecture designed
+   - Integration strategy with existing monitoring systems defined
+   - Performance requirements and quality gates established
+
 ### Upcoming Milestones 🎯
-1. **Irrigation Control Core** (Target: Next development session)
-   - GPIO control implementation
-   - Basic relay switching capability
-   - Safety interlock system
-   - Zone management foundation
+**REFERENCE**: Follow `memory-bank/webServerImplementationPlan.md` for detailed timeline
 
-2. **Sensor Integration** (Target: Following session)
-   - ADC interface implementation
-   - Basic sensor reading capability
-   - Data validation and error handling
-   - Integration with monitoring system
+1. **WiFi Foundation** (Target: Next development session)
+   - WiFiHandler/WiFiManager implementation
+   - Connection status monitoring integration
+   - Auto-reconnection logic
+   - Foundation for web server architecture
 
-3. **Web Server Foundation** (Target: Week 2)
-   - HTTP server implementation
-   - Basic web interface
-   - WiFi connection management
-   - Remote monitoring capability
+2. **Basic HTTP Server** (Target: Following session)
+   - ESPAsyncWebServer initialization
+   - Basic endpoint implementation
+   - Task monitoring integration
+   - "Hello World" web interface
+
+3. **Web Server Core** (Target: Week 1-2)
+   - Static file controller with caching
+   - Authentication foundation
+   - System monitoring web interface
+   - Configuration management via web
+
+4. **Production Web Server** (Target: Week 3-4)
+   - Request priority management
+   - Storage foundation (SPIFFS/LittleFS)
+   - Event logging system
+   - Complete dashboard controller
 
 ## Quality Gates
 

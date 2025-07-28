@@ -23,6 +23,10 @@
   - `esp_timer`: High-resolution timer
   - `heap`: Memory management
   - `esp_system`: System utilities
+  - `esp_http_server`: HTTP server functionality (Step 2+)
+  - `esp_wifi`: WiFi connectivity (Step 1+)
+  - `esp_event`: Event handling system
+  - `nvs_flash`: Non-volatile storage
 
 ## Development Setup
 
