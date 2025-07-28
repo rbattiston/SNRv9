@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNRv9 Irrigation Control System</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>SNRv9 Irrigation Control System</h1>
+            <p class="subtitle">Web Interface v1.0.0</p>
+        </header>
+        
+        <main>
+            <section class="status-section">
+                <h2>System Status</h2>
+                <div id="system-status" class="status-card">
+                    <p>Loading system status...</p>
+                </div>
+                <button onclick="refreshStatus()">Refresh Status</button>
+            </section>
+            
+            <section class="navigation-section">
+                <h2>Quick Navigation</h2>
+                <div class="nav-grid">
+                    <a href="/test.html" class="nav-card">
+                        <h3>API Test</h3>
+                        <p>Test API endpoints and JavaScript</p>
+                    </a>
+                    <a href="/dashboard.html" class="nav-card">
+                        <h3>Dashboard</h3>
+                        <p>Real-time system monitoring</p>
+                    </a>
+                    <a href="/config.html" class="nav-card">
+                        <h3>Configuration</h3>
+                        <p>System settings and WiFi</p>
+                    </a>
+                    <a href="/logs.html" class="nav-card">
+                        <h3>System Logs</h3>
+                        <p>View system events and logs</p>
+                    </a>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>&copy; 2025 SNRv9 Irrigation Control System</p>
+        </footer>
+    </div>
+    
+    <script src="/app.js"></script>
+</body>
+</html>

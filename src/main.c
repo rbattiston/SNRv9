@@ -14,6 +14,7 @@
 #include "memory_monitor.h"
 #include "task_tracker.h"
 #include "wifi_handler.h"
+#include "web_server_manager.h"
 #include "debug_config.h"
 
 static const char *TAG = "SNRv9_MAIN";
@@ -69,6 +70,13 @@ void app_main(void)
         return;
     }
     
+    // Initialize web server manager
+    ESP_LOGI(TAG, "Initializing web server manager...");
+    if (!web_server_manager_init()) {
+        ESP_LOGE(TAG, "Failed to initialize web server manager");
+        return;
+    }
+    
     // Register task lifecycle callbacks
     task_tracker_register_creation_callback(on_task_created);
     task_tracker_register_deletion_callback(on_task_deleted);
@@ -93,12 +101,26 @@ void app_main(void)
     
     ESP_LOGI(TAG, "All systems started successfully");
     ESP_LOGI(TAG, "WiFi connecting to S3CURE_WIFI...");
+    
+    // Wait for WiFi connection before starting web server
+    bool web_server_started = false;
     ESP_LOGI(TAG, "System ready for irrigation control implementation");
     
     // Main application loop
     uint32_t loop_counter = 0;
     while (1) {
         loop_counter++;
+        
+        // Start web server once WiFi is connected
+        if (!web_server_started && wifi_handler_is_connected()) {
+            ESP_LOGI(TAG, "WiFi connected, starting web server...");
+            if (web_server_manager_start()) {
+                ESP_LOGI(TAG, "Web server started successfully");
+                web_server_started = true;
+            } else {
+                ESP_LOGE(TAG, "Failed to start web server");
+            }
+        }
         
         // Detailed system reports every 60 seconds
         if (loop_counter % 600 == 0) {
@@ -107,6 +129,9 @@ void app_main(void)
             task_tracker_print_detailed_report();
             task_tracker_print_stack_analysis();
             wifi_handler_print_detailed_report();
+            if (web_server_started) {
+                web_server_manager_print_status();
+            }
             
             // Check for potential memory leaks
             if (memory_monitor_check_for_leaks()) {

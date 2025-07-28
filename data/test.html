@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNRv9 API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; }
+        .error { background-color: #f8d7da; }
+        button { padding: 10px 15px; margin: 5px; }
+        pre { background: #f8f9fa; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>SNRv9 API Test Page</h1>
+    
+    <div class="test-section">
+        <h2>JavaScript Loading Test</h2>
+        <p id="js-test">JavaScript not loaded</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>API Status Test</h2>
+        <button onclick="testApiStatus()">Test /api/status</button>
+        <div id="api-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Function Test</h2>
+        <button onclick="testRefreshStatus()">Test refreshStatus()</button>
+        <div id="function-result"></div>
+    </div>
+
+    <script>
+        // Test 1: Verify JavaScript is loading
+        document.getElementById('js-test').textContent = 'JavaScript loaded successfully!';
+        document.getElementById('js-test').parentElement.className = 'test-section success';
+        
+        // Test 2: Test API endpoint directly
+        function testApiStatus() {
+            const resultDiv = document.getElementById('api-result');
+            resultDiv.innerHTML = '<p>Testing /api/status...</p>';
+            
+            fetch('/api/status')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    resultDiv.innerHTML = '<div class="success"><h3>API Success!</h3><pre>' + JSON.stringify(data, null, 2) + '</pre></div>';
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = '<div class="error"><h3>API Error:</h3><p>' + error.message + '</p></div>';
+                });
+        }
+        
+        // Test 3: Test if refreshStatus function exists
+        function testRefreshStatus() {
+            const resultDiv = document.getElementById('function-result');
+            
+            if (typeof refreshStatus === 'function') {
+                resultDiv.innerHTML = '<div class="success"><p>refreshStatus() function exists and is callable</p></div>';
+                try {
+                    refreshStatus();
+                    resultDiv.innerHTML += '<p>Function executed without errors</p>';
+                } catch (error) {
+                    resultDiv.innerHTML += '<div class="error"><p>Function execution error: ' + error.message + '</p></div>';
+                }
+            } else {
+                resultDiv.innerHTML = '<div class="error"><p>refreshStatus() function not found</p></div>';
+            }
+        }
+        
+        // Test 4: Check if app.js loaded
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (typeof refreshStatus === 'function') {
+                    console.log('✓ app.js loaded successfully');
+                } else {
+                    console.error('✗ app.js did not load or refreshStatus not available');
+                }
+            }, 1000);
+        });
+        
+        console.log('Test page JavaScript loaded');
+    </script>
+    
+    <!-- Load the main app.js to test if it works -->
+    <script src="/app.js"></script>
+</body>
+</html>

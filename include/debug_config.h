@@ -103,6 +103,16 @@ extern "C" {
  */
 #define DEBUG_TASK_TAG "TASK"
 
+/**
+ * @brief Debug output tag for web server
+ */
+#define DEBUG_WEB_SERVER_TAG "WEB_SERVER"
+
+/**
+ * @brief Debug output tag for static file controller
+ */
+#define DEBUG_STATIC_FILE_TAG "STATIC_FILE"
+
 /* =============================================================================
  * FUTURE EXPANSION DEBUG FLAGS
  * =============================================================================
