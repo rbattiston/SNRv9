@@ -13,6 +13,7 @@
 #include "esp_chip_info.h"
 #include "memory_monitor.h"
 #include "task_tracker.h"
+#include "wifi_handler.h"
 #include "debug_config.h"
 
 static const char *TAG = "SNRv9_MAIN";
@@ -61,6 +62,13 @@ void app_main(void)
         return;
     }
     
+    // Initialize WiFi handler system
+    ESP_LOGI(TAG, "Initializing WiFi handler...");
+    if (!wifi_handler_init()) {
+        ESP_LOGE(TAG, "Failed to initialize WiFi handler");
+        return;
+    }
+    
     // Register task lifecycle callbacks
     task_tracker_register_creation_callback(on_task_created);
     task_tracker_register_deletion_callback(on_task_deleted);
@@ -76,7 +84,15 @@ void app_main(void)
         return;
     }
     
-    ESP_LOGI(TAG, "Memory monitoring system started successfully");
+    // Start WiFi handler system
+    ESP_LOGI(TAG, "Starting WiFi handler...");
+    if (!wifi_handler_start()) {
+        ESP_LOGE(TAG, "Failed to start WiFi handler");
+        return;
+    }
+    
+    ESP_LOGI(TAG, "All systems started successfully");
+    ESP_LOGI(TAG, "WiFi connecting to S3CURE_WIFI...");
     ESP_LOGI(TAG, "System ready for irrigation control implementation");
     
     // Main application loop
@@ -90,6 +106,7 @@ void app_main(void)
             memory_monitor_print_detailed_report();
             task_tracker_print_detailed_report();
             task_tracker_print_stack_analysis();
+            wifi_handler_print_detailed_report();
             
             // Check for potential memory leaks
             if (memory_monitor_check_for_leaks()) {
@@ -102,6 +119,7 @@ void app_main(void)
             ESP_LOGI(TAG, "--- System Status ---");
             memory_monitor_force_report();
             task_tracker_print_summary();
+            wifi_handler_print_summary();
         }
         
         // Check stack warnings every 5 seconds for safety

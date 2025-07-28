@@ -18,7 +18,7 @@
  * =============================================================================
  */
 
-#define MEMORY_MONITOR_TASK_STACK_SIZE  2048
+#define MEMORY_MONITOR_TASK_STACK_SIZE  3072  // Increased from 2048
 #define MEMORY_MONITOR_TASK_PRIORITY    1
 #define MEMORY_MONITOR_TASK_NAME        "mem_monitor"
 

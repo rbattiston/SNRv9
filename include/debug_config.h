@@ -121,6 +121,18 @@ extern "C" {
 #define DEBUG_SENSORS 0
 
 /**
+ * @brief Enable/disable WiFi monitoring debug output
+ * Set to 1 to enable WiFi connection monitoring, 0 to disable
+ */
+#define DEBUG_WIFI_MONITORING 1
+
+/**
+ * @brief WiFi status report interval in milliseconds
+ * How often to output WiFi status to serial
+ */
+#define DEBUG_WIFI_REPORT_INTERVAL_MS 30000
+
+/**
  * @brief Enable/disable web server debug output
  * Reserved for future web server debugging
  */

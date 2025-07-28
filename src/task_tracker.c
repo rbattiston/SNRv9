@@ -17,9 +17,15 @@
  * =============================================================================
  */
 
-#define TASK_TRACKER_TASK_STACK_SIZE    2048
+#define TASK_TRACKER_TASK_STACK_SIZE    3072  // Increased from 2048
 #define TASK_TRACKER_TASK_PRIORITY      1
 #define TASK_TRACKER_TASK_NAME          "task_tracker"
+
+// Stack size constants for known tasks
+#define DEFAULT_STACK_SIZE              2048
+#define MEMORY_MONITOR_STACK_SIZE       3072
+#define WIFI_MONITOR_STACK_SIZE         6144
+#define TASK_TRACKER_STACK_SIZE         3072
 
 #if DEBUG_INCLUDE_TIMESTAMPS
 #define TIMESTAMP_FORMAT "[%02d:%02d:%02d.%03d] "
@@ -74,6 +80,7 @@ static const char* task_state_to_string(task_state_t state);
 static void calculate_task_stats(void);
 static int find_task_by_handle(TaskHandle_t handle);
 static int find_empty_slot(void);
+static uint32_t estimate_task_stack_size(const char *task_name);
 
 /* =============================================================================
  * PUBLIC FUNCTION IMPLEMENTATIONS
@@ -432,11 +439,10 @@ void task_tracker_check_stack_warnings(void)
             if (g_task_tracker.task_list[i].is_valid) {
                 task_info_t *task = &g_task_tracker.task_list[i];
                 
-                // Calculate stack usage percentage
-                uint32_t stack_remaining = task->stack_high_water_mark;
-                uint32_t stack_total = 2048; // Default stack size for our demo tasks
-                uint32_t stack_used = stack_total - stack_remaining;
-                uint8_t usage_pct = (stack_used * 100) / stack_total;
+                // Use the actual calculated stack usage from the task structure
+                uint8_t usage_pct = task_tracker_calc_stack_usage_pct(task);
+                uint32_t stack_used = task->stack_used;
+                uint32_t stack_total = task->stack_size;
                 
                 // Issue warnings based on usage
                 if (usage_pct >= 90) {
@@ -588,8 +594,17 @@ static void update_task_list(void)
         task->state = freertos_state_to_task_state(status->eCurrentState);
         task->runtime_counter = status->ulRunTimeCounter;
         task->stack_high_water_mark = status->usStackHighWaterMark * sizeof(StackType_t);
-        task->stack_size = 0; // FreeRTOS doesn't provide this directly
-        task->stack_used = task->stack_size - task->stack_high_water_mark;
+        task->stack_size = estimate_task_stack_size(task->name);
+        
+        // Prevent integer underflow and validate stack calculations
+        if (task->stack_high_water_mark <= task->stack_size) {
+            task->stack_used = task->stack_size - task->stack_high_water_mark;
+        } else {
+            // High water mark is larger than estimated stack size - use a conservative estimate
+            task->stack_used = task->stack_size * 80 / 100; // Assume 80% usage
+            ESP_LOGW(TAG, "Task '%s': High water mark (%u) > estimated stack (%u), using conservative estimate",
+                     task->name, (unsigned int)task->stack_high_water_mark, (unsigned int)task->stack_size);
+        }
         task->creation_time = GET_TIMESTAMP();
         task->is_valid = true;
 
@@ -718,4 +733,39 @@ static int find_empty_slot(void)
         }
     }
     return -1;
+}
+
+static uint32_t estimate_task_stack_size(const char *task_name)
+{
+    if (task_name == NULL) {
+        return DEFAULT_STACK_SIZE;
+    }
+
+    // Known task stack sizes based on our configuration
+    if (strcmp(task_name, "task_tracker") == 0) {
+        return TASK_TRACKER_STACK_SIZE;
+    } else if (strcmp(task_name, "mem_monitor") == 0) {
+        return MEMORY_MONITOR_STACK_SIZE;
+    } else if (strcmp(task_name, "wifi_monitor") == 0) {
+        return WIFI_MONITOR_STACK_SIZE;
+    } else if (strcmp(task_name, "wifi") == 0) {
+        return 6656; // ESP-IDF WiFi task stack size
+    } else if (strcmp(task_name, "esp_timer") == 0) {
+        return 3584; // ESP-IDF timer task stack size
+    } else if (strcmp(task_name, "tiT") == 0) {
+        return 4096; // TCP/IP task - increased from 2048
+    } else if (strcmp(task_name, "sys_evt") == 0) {
+        return 2304; // System event task
+    } else if (strcmp(task_name, "ipc0") == 0 || strcmp(task_name, "ipc1") == 0) {
+        return 1024; // IPC tasks
+    } else if (strcmp(task_name, "Tmr Svc") == 0) {
+        return 2048; // Timer service task
+    } else if (strncmp(task_name, "IDLE", 4) == 0) {
+        return 1536; // IDLE tasks
+    } else if (strcmp(task_name, "main") == 0) {
+        return 3584; // Main task
+    }
+
+    // Default for unknown tasks
+    return DEFAULT_STACK_SIZE;
 }
