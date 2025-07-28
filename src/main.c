@@ -18,41 +18,7 @@
 static const char *TAG = "SNRv9_MAIN";
 
 /**
- * @brief Demo task to show memory monitoring in action
- */
-static void demo_task(void *pvParameters)
-{
-    const char *task_name = (const char *)pvParameters;
-    uint32_t counter = 0;
-    
-    ESP_LOGI(TAG, "Demo task '%s' started", task_name);
-    
-    while (1) {
-        // Simulate some work
-        counter++;
-        
-        // Allocate and free some memory to show memory changes
-        if (counter % 10 == 0) {
-            void *temp_mem = malloc(1024);
-            if (temp_mem) {
-                // Use the memory briefly
-                memset(temp_mem, 0xAA, 1024);
-                vTaskDelay(pdMS_TO_TICKS(100));
-                free(temp_mem);
-            }
-        }
-        
-        // Print a message every 30 seconds
-        if (counter % 300 == 0) {
-            ESP_LOGI(TAG, "Demo task '%s' counter: %u", task_name, (unsigned int)counter);
-        }
-        
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-}
-
-/**
- * @brief Task creation callback for demonstration
+ * @brief Task creation callback for system monitoring
  */
 static void on_task_created(const task_info_t *task)
 {
@@ -61,7 +27,7 @@ static void on_task_created(const task_info_t *task)
 }
 
 /**
- * @brief Task deletion callback for demonstration
+ * @brief Task deletion callback for system monitoring
  */
 static void on_task_deleted(const task_info_t *task)
 {
@@ -111,26 +77,18 @@ void app_main(void)
     }
     
     ESP_LOGI(TAG, "Memory monitoring system started successfully");
-    
-    // Create some demo tasks to show the monitoring in action
-    // Using adequate stack sizes to prevent overflow (minimum 2048 bytes for ESP32)
-    xTaskCreate(demo_task, "demo_task_1", 2048, "Task1", 2, NULL);
-    xTaskCreate(demo_task, "demo_task_2", 2048, "Task2", 3, NULL);
-    xTaskCreate(demo_task, "demo_task_3", 2048, "Task3", 1, NULL);
-    
-    ESP_LOGI(TAG, "Demo tasks created - monitoring system will track them");
+    ESP_LOGI(TAG, "System ready for irrigation control implementation");
     
     // Main application loop
     uint32_t loop_counter = 0;
     while (1) {
         loop_counter++;
         
-        // Print detailed reports every 60 seconds
-        if (loop_counter % 600 == 0) {
-            ESP_LOGI(TAG, "=== PERIODIC SYSTEM REPORT ===");
+        // Periodic system health checks (every 5 minutes)
+        if (loop_counter % 3000 == 0) {
+            ESP_LOGI(TAG, "=== SYSTEM HEALTH CHECK ===");
             memory_monitor_print_detailed_report();
             task_tracker_print_detailed_report();
-            task_tracker_print_stack_analysis();
             
             // Check for potential memory leaks
             if (memory_monitor_check_for_leaks()) {
@@ -138,20 +96,16 @@ void app_main(void)
             }
         }
         
-        // Force immediate reports every 20 seconds for demonstration
-        if (loop_counter % 200 == 0) {
-            ESP_LOGI(TAG, "--- Quick Status Check ---");
-            memory_monitor_force_report();
-            task_tracker_print_summary();
-            
-            // Check for stack warnings more frequently
+        // Check stack warnings every 30 seconds for safety
+        if (loop_counter % 300 == 0) {
             task_tracker_check_stack_warnings();
         }
         
-        // Check stack warnings every 5 seconds for early detection
-        if (loop_counter % 50 == 0) {
-            task_tracker_check_stack_warnings();
-        }
+        // TODO: Add irrigation control logic here
+        // - Check sensor readings
+        // - Process irrigation schedules
+        // - Control relays/solenoids
+        // - Handle web server requests
         
         vTaskDelay(pdMS_TO_TICKS(100));
     }
