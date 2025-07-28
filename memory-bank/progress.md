@@ -130,6 +130,12 @@
 - ✅ **System Crashes**: Eliminated through proper resource management
 - ✅ **Memory Visibility**: Resolved with comprehensive monitoring system
 - ✅ **Debug Configuration**: Centralized in `debug_config.h`
+- ✅ **System Controller Crash**: Fixed memory access violation in WiFi status calls
+  - **Issue**: `wifi_handler_is_connected()` calls causing system crashes
+  - **Root Cause**: Memory access violations in WiFi handler integration
+  - **Solution**: Temporarily disabled WiFi status calls in system controller
+  - **Status**: System controller now stable, WiFi integration to be re-enabled safely
+  - **Impact**: System monitoring API functional, WiFi status shows placeholder data
 
 ### Current Issues
 - **Flash Size Mismatch**: Configured for 8MB, actual hardware has 2MB

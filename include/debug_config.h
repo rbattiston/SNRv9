@@ -113,6 +113,11 @@ extern "C" {
  */
 #define DEBUG_STATIC_FILE_TAG "STATIC_FILE"
 
+/**
+ * @brief Debug output tag for system controller
+ */
+#define DEBUG_SYSTEM_CONTROLLER_TAG "SYSTEM_CTRL"
+
 /* =============================================================================
  * FUTURE EXPANSION DEBUG FLAGS
  * =============================================================================

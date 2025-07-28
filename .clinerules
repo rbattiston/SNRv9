@@ -78,6 +78,18 @@ Idle Priority (0): IDLE tasks (system)
 - Continuous monitoring every 5 seconds
 - Proactive alerts before overflow conditions
 
+### System Controller Memory Access Violations (January 28, 2025)
+**Challenge**: Critical crashes when accessing WiFi handler functions from system controller
+**Root Cause**: Memory access violations in `wifi_handler_is_connected()` calls
+**Symptoms**: System crashes/reboots when accessing `/api/system/status` endpoints
+**Solution**:
+- Temporarily disabled all `wifi_handler_is_connected()` calls in system controller
+- Replaced WiFi status with safe placeholder data
+- Maintained API structure for future re-integration
+- System controller now stable with all endpoints functional
+**Lesson**: External function calls in web handlers require careful memory safety validation
+**Future**: WiFi integration to be re-enabled with proper safety checks
+
 ### Thread Safety in Monitoring
 **Challenge**: Multiple tasks accessing shared monitoring data
 **Solution**:
