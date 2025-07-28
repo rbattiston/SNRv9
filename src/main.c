@@ -15,6 +15,8 @@
 #include "task_tracker.h"
 #include "wifi_handler.h"
 #include "web_server_manager.h"
+#include "auth_manager.h"
+#include "auth_controller.h"
 #include "debug_config.h"
 
 static const char *TAG = "SNRv9_MAIN";
@@ -67,6 +69,13 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing WiFi handler...");
     if (!wifi_handler_init()) {
         ESP_LOGE(TAG, "Failed to initialize WiFi handler");
+        return;
+    }
+    
+    // Initialize authentication manager
+    ESP_LOGI(TAG, "Initializing authentication manager...");
+    if (!auth_manager_init()) {
+        ESP_LOGE(TAG, "Failed to initialize authentication manager");
         return;
     }
     
@@ -131,6 +140,7 @@ void app_main(void)
             wifi_handler_print_detailed_report();
             if (web_server_started) {
                 web_server_manager_print_status();
+                auth_manager_print_status();
             }
             
             // Check for potential memory leaks

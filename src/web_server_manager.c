@@ -4,6 +4,7 @@
  */
 
 #include "web_server_manager.h"
+#include "auth_controller.h"
 #include "debug_config.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -147,6 +148,15 @@ bool web_server_manager_start(void)
     // Register static file handlers
     if (!static_file_controller_register_handlers(g_web_server.server_handle)) {
         ESP_LOGE(TAG, "Failed to register static file handlers");
+        httpd_stop(g_web_server.server_handle);
+        g_web_server.server_handle = NULL;
+        g_web_server.status = WEB_SERVER_ERROR;
+        return false;
+    }
+
+    // Initialize authentication controller
+    if (!auth_controller_init(g_web_server.server_handle)) {
+        ESP_LOGE(TAG, "Failed to initialize authentication controller");
         httpd_stop(g_web_server.server_handle);
         g_web_server.server_handle = NULL;
         g_web_server.status = WEB_SERVER_ERROR;
