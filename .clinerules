@@ -1,0 +1,163 @@
+# SNRv9 Project Intelligence - .clinerules
+
+## Critical Implementation Paths
+
+### ESP32 Stack Requirements
+**Key Learning**: ESP32 tasks require minimum 2048 bytes stack for reliable operation
+- **Context**: Initial demo tasks with 1536/1024 bytes caused stack overflow crashes
+- **Solution**: Always use 2048+ bytes for application tasks
+- **Monitoring**: Implement stack usage warnings at 70%, 80%, 90% thresholds
+- **Critical**: Stack overflow prevention is essential for system stability
+
+### Memory Monitoring Architecture
+**Pattern**: Centralized monitoring with thread-safe data collection
+- **Implementation**: Separate monitoring modules (memory_monitor, task_tracker)
+- **Thread Safety**: Always use FreeRTOS mutexes with 100ms timeout
+- **Performance**: Keep monitoring overhead <1% CPU usage
+- **Reporting**: Multiple intervals - memory (30s), tasks (10s), stack warnings (5s)
+
+### Debug Configuration Strategy
+**Pattern**: Compile-time configurable debug output via centralized header
+- **File**: `include/debug_config.h` - single point of control
+- **Production Safety**: Zero performance impact when disabled
+- **Flexibility**: Individual enable/disable for each monitoring system
+- **Timestamps**: Configurable timestamp support for debug correlation
+
+## User Preferences and Workflow
+
+### Development Approach
+- **Incremental Development**: Build and test each component thoroughly before proceeding
+- **Comprehensive Monitoring**: Implement monitoring for every system component
+- **Proactive Issue Detection**: Early warning systems prevent failures
+- **Documentation First**: Memory bank documentation maintained alongside code
+
+### Code Quality Standards
+- **Naming Convention**: snake_case for functions and variables
+- **Documentation**: Doxygen-style comments for all public functions
+- **Error Handling**: Consistent error checking and graceful degradation
+- **Thread Safety**: Mutex protection for all shared data structures
+
+### Testing Philosophy
+- **Extended Operation**: Minimum 1-hour continuous operation testing
+- **Resource Monitoring**: Continuous tracking of memory and stack usage
+- **Failure Prevention**: Focus on preventing issues rather than recovering from them
+- **Real Hardware**: Always test on actual ESP32 hardware, not simulation
+
+## Project-Specific Patterns
+
+### ESP-IDF/FreeRTOS Integration
+**Key Patterns**:
+- Use `esp_timer_get_time()` for high-resolution timestamps
+- Leverage `uxTaskGetSystemState()` for comprehensive task information
+- Implement proper task priority hierarchy (monitoring tasks at low priority)
+- Use `pvPortMalloc/vPortFree` for FreeRTOS-aware memory allocation
+
+### Memory Management Strategy
+**Approach**: Monitor but don't interfere with normal allocation
+- **Heap Tracking**: Periodic sampling of `esp_get_free_heap_size()`
+- **Leak Detection**: Trend analysis over time rather than absolute thresholds
+- **Fragmentation**: Monitor largest free block vs total free memory
+- **Safety**: Never allocate memory in monitoring code paths
+
+### Task Architecture
+**Design Pattern**: Layered task structure
+```
+High Priority (24): IPC tasks (system)
+Medium Priority (2-3): Application tasks (irrigation control)
+Low Priority (1): Monitoring tasks (memory, task tracking)
+Idle Priority (0): IDLE tasks (system)
+```
+
+## Known Challenges and Solutions
+
+### Stack Overflow Prevention
+**Challenge**: ESP32 stack requirements higher than expected
+**Solution**: 
+- Minimum 2048 bytes for application tasks
+- Multi-level warning system (70%, 80%, 90%)
+- Continuous monitoring every 5 seconds
+- Proactive alerts before overflow conditions
+
+### Thread Safety in Monitoring
+**Challenge**: Multiple tasks accessing shared monitoring data
+**Solution**:
+- FreeRTOS mutexes with timeout (100ms)
+- Atomic operations where possible
+- Separate data collection and reporting phases
+- Graceful degradation if mutex acquisition fails
+
+### Production vs Development Configuration
+**Challenge**: Debug output needed for development but not production
+**Solution**:
+- Compile-time flags in centralized header
+- Macro-based debug output system
+- Zero performance impact when disabled
+- Easy toggle between development and production builds
+
+## Evolution of Project Decisions
+
+### Initial Approach vs Current Implementation
+**Initial**: Simple printf debugging
+**Current**: Comprehensive monitoring system with configurable output
+**Reason**: Need for production-ready debugging and system visibility
+
+**Initial**: Basic task creation without monitoring
+**Current**: Full task lifecycle tracking with early warning systems
+**Reason**: Stack overflow issues required proactive monitoring
+
+**Initial**: Scattered debug configuration
+**Current**: Centralized configuration in `debug_config.h`
+**Reason**: Maintainability and production deployment requirements
+
+### Architecture Evolution
+**Phase 1**: Basic ESP32 project structure
+**Phase 2**: Added memory monitoring system
+**Phase 3**: Added task tracking system
+**Phase 4**: Integrated early warning systems
+**Current**: Stable foundation ready for irrigation control implementation
+
+## Tool Usage Patterns
+
+### PlatformIO Workflow
+- Use `pio run` for building (checks compilation)
+- Use `pio run --target upload` for deployment
+- Use `pio device monitor` for serial debugging
+- Monitor build warnings (especially memory size mismatches)
+
+### Development Cycle
+1. Implement feature with comprehensive error checking
+2. Build and verify compilation
+3. Upload to hardware and test
+4. Monitor serial output for issues
+5. Run extended operation test (minimum 1 hour)
+6. Update memory bank documentation
+7. Commit changes with descriptive messages
+
+### Debugging Strategy
+- Enable all monitoring systems during development
+- Use timestamped debug output for correlation
+- Monitor stack usage continuously during testing
+- Check for memory leaks over extended operation
+- Verify thread safety under load conditions
+
+## Critical Success Factors
+
+### System Reliability
+- Zero tolerance for crashes or reboots
+- Proactive issue detection before failures
+- Comprehensive resource monitoring
+- Graceful degradation on component failures
+
+### Development Efficiency
+- Centralized configuration management
+- Comprehensive diagnostic information
+- Clear separation between development and production builds
+- Maintainable code structure with good documentation
+
+### Commercial Readiness
+- Production-safe debug output control
+- Reliable operation under all conditions
+- Comprehensive monitoring for maintenance
+- Scalable architecture for future features
+
+This project demonstrates the importance of building robust monitoring and diagnostic systems early in embedded development. The investment in comprehensive monitoring pays dividends in system reliability and development efficiency.
