@@ -84,11 +84,12 @@ void app_main(void)
     while (1) {
         loop_counter++;
         
-        // Periodic system health checks (every 5 minutes)
-        if (loop_counter % 3000 == 0) {
+        // Detailed system reports every 60 seconds
+        if (loop_counter % 600 == 0) {
             ESP_LOGI(TAG, "=== SYSTEM HEALTH CHECK ===");
             memory_monitor_print_detailed_report();
             task_tracker_print_detailed_report();
+            task_tracker_print_stack_analysis();
             
             // Check for potential memory leaks
             if (memory_monitor_check_for_leaks()) {
@@ -96,8 +97,15 @@ void app_main(void)
             }
         }
         
-        // Check stack warnings every 30 seconds for safety
-        if (loop_counter % 300 == 0) {
+        // Regular status updates every 20 seconds
+        if (loop_counter % 200 == 0) {
+            ESP_LOGI(TAG, "--- System Status ---");
+            memory_monitor_force_report();
+            task_tracker_print_summary();
+        }
+        
+        // Check stack warnings every 5 seconds for safety
+        if (loop_counter % 50 == 0) {
             task_tracker_check_stack_warnings();
         }
         

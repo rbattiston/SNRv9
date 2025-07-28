@@ -134,9 +134,10 @@ SNRv9/
 4. **Monitoring**: Serial monitor for debug output and verification
 
 ### Memory Usage Analysis
-- **RAM Usage**: Currently 4.4% (14,352 bytes of 327,680 bytes)
-- **Flash Usage**: Currently 19.3% (202,380 bytes of 1,048,576 bytes)
-- **Stack Allocation**: 2048 bytes per demo task (adequate for current usage)
+- **RAM Usage**: Currently 4.4% (14,352 bytes of 327,680 bytes) - optimized after demo removal
+- **Flash Usage**: Currently 19.2% (200,860 bytes of 1,048,576 bytes) - reduced after cleanup
+- **Stack Allocation**: System tasks only (demo tasks removed, ready for irrigation control)
+- **Task Count**: 5 tasks (main, 2 idle, 2 ipc) - streamlined for production
 
 ## Development Practices
 

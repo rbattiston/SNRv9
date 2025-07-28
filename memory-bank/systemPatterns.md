@@ -137,7 +137,7 @@ debug_config.h
 1. Initialize monitoring systems (memory_monitor_init, task_tracker_init)
 2. Start monitoring tasks (memory_monitor_start, task_tracker_start)
 3. Register callbacks for task lifecycle events
-4. Begin application-specific tasks
+4. System ready for irrigation control implementation (demo tasks removed)
 ```
 
 ### 2. Periodic Reporting

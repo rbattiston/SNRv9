@@ -54,7 +54,7 @@
 **Changes Made**:
 - Removed demo_task function and all demo task creation calls
 - Simplified main application loop for irrigation control focus
-- Reduced monitoring frequency to production-appropriate levels (5-minute health checks)
+- Restored appropriate monitoring frequency (20-second status updates, 60-second detailed reports)
 - Added TODO placeholders for irrigation control implementation
 - Maintained all monitoring systems for production reliability
 
@@ -68,9 +68,10 @@
 
 ### Monitoring Effectiveness
 - **Memory Monitoring**: Active, automatic reporting every 30 seconds
-- **Task Tracking**: Active, automatic reporting every 10 seconds
-- **Stack Warnings**: Active, checking every 30 seconds (production frequency)
-- **Health Checks**: Comprehensive system reports every 5 minutes
+- **Task Tracking**: Active, status updates every 20 seconds, detailed reports every 60 seconds
+- **Stack Warnings**: Active, checking every 5 seconds for safety
+- **Health Checks**: Comprehensive system reports every 60 seconds
+- **Task Visibility**: Regular task listings visible in serial debugger
 
 ### Performance Metrics
 - **RAM Usage**: 4.4% (14,352 bytes of 327,680 bytes) - reduced after demo removal
