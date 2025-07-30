@@ -4,7 +4,7 @@
 
 ### Core Platform
 - **Microcontroller**: ESP32-D0WD-V3 (Dual-core Xtensa LX6, 240MHz)
-- **Memory**: 320KB SRAM, 4MB Flash (current board: 2MB Flash)
+- **Memory**: 320KB SRAM, 2MB Flash
 - **Connectivity**: WiFi 802.11 b/g/n, Bluetooth Classic/BLE
 - **Development Framework**: ESP-IDF 5.4.1
 - **Real-Time OS**: FreeRTOS (integrated with ESP-IDF)
@@ -27,6 +27,7 @@
   - `esp_wifi`: WiFi connectivity (Step 1+)
   - `esp_event`: Event handling system
   - `nvs_flash`: Non-volatile storage
+  - `littlefs`: Filesystem for flash storage
 
 ## Development Setup
 
@@ -36,11 +37,13 @@ SNRv9/
 ├── include/           # Header files
 │   ├── debug_config.h    # Debug configuration
 │   ├── memory_monitor.h  # Memory monitoring interface
-│   └── task_tracker.h    # Task tracking interface
+│   ├── task_tracker.h    # Task tracking interface
+│   └── storage_manager.h # Filesystem management
 ├── src/               # Source files
 │   ├── main.c            # Application entry point
 │   ├── memory_monitor.c  # Memory monitoring implementation
-│   └── task_tracker.c    # Task tracking implementation
+│   ├── task_tracker.c    # Task tracking implementation
+│   └── storage_manager.c # Filesystem management
 ├── memory-bank/       # Project documentation
 ├── platformio.ini     # PlatformIO configuration
 ├── CMakeLists.txt     # Build configuration
@@ -64,7 +67,7 @@ SNRv9/
 
 ### Hardware Limitations
 - **RAM**: 320KB total (shared between heap, stack, and static allocation)
-- **Flash**: 2MB available (warning: configured for 8MB)
+- **Flash**: 2MB available
 - **CPU**: Dual-core but currently using single-core approach
 - **Real-time Requirements**: FreeRTOS tick rate and task scheduling
 
@@ -91,6 +94,7 @@ SNRv9/
 #include "esp_timer.h"             // High-resolution timers
 #include "esp_system.h"            // System utilities
 #include "esp_chip_info.h"         // Hardware information
+#include "esp_littlefs.h"          // LittleFS filesystem support
 ```
 
 ### Standard C Library Dependencies

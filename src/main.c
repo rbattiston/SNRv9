@@ -17,6 +17,7 @@
 #include "web_server_manager.h"
 #include "auth_manager.h"
 #include "auth_controller.h"
+#include "storage_manager.h"
 #include "debug_config.h"
 
 static const char *TAG = "SNRv9_MAIN";
@@ -84,6 +85,34 @@ void app_main(void)
     if (!web_server_manager_init()) {
         ESP_LOGE(TAG, "Failed to initialize web server manager");
         return;
+    }
+
+    // Initialize storage manager
+    ESP_LOGI(TAG, "Initializing storage manager...");
+    if (storage_manager_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize storage manager");
+        // Continuing without storage, but functionality will be limited
+    } else {
+        // Test file operations
+        FILE *f = fopen("/littlefs/boot_count.txt", "r+");
+        if (f == NULL) {
+            // File doesn't exist, create it
+            f = fopen("/littlefs/boot_count.txt", "w");
+            if (f != NULL) {
+                fprintf(f, "1\n");
+                ESP_LOGI(TAG, "Created boot_count.txt, boot count: 1");
+                fclose(f);
+            }
+        } else {
+            // File exists, increment boot count
+            int count = 0;
+            fscanf(f, "%d", &count);
+            count++;
+            rewind(f);
+            fprintf(f, "%d\n", count);
+            ESP_LOGI(TAG, "Incremented boot count to: %d", count);
+            fclose(f);
+        }
     }
     
     // Register task lifecycle callbacks

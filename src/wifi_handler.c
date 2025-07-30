@@ -29,7 +29,7 @@
 static const char *TAG = "wifi_handler";
 
 // WiFi Configuration
-#define WIFI_SSID               "S3CURE_WIFI"
+#define WIFI_SSID               "Secure Office"
 #define WIFI_PASSWORD           "Hoyt1000!"
 #define WIFI_MAXIMUM_RETRY      5
 #define WIFI_RECONNECT_DELAY_MS 5000
