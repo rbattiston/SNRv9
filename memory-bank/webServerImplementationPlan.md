@@ -169,28 +169,64 @@ This document outlines the step-by-step implementation plan for building a sophi
 
 ---
 
-### Step 6: Configuration Management
-**Component**: ConfigManager
-**Priority**: Medium
+### Step 6: Configuration Management + I/O Framework (Combined Priority Step)
+**Component**: ConfigManager + IOManager + ConfigController + IOController
+**Priority**: High (Current Step)
 
 **Implementation Details**:
-- Basic configuration storage (in-memory initially)
-- Configuration REST API endpoints (`/api/config/*`)
-- System settings management
-- WiFi configuration via web interface
-- Preparation for persistent storage
+
+**ConfigManager**: Industrial-grade configuration management
+- Load and serve sophisticated IO configuration JSON (`io_config full_ES32D26 wEnabledProcessing.json`)
+- Support for shift register configuration, analog input settings, alarm rules
+- Thread-safe configuration access with validation
+- Integration with storage_manager for persistence
+- Real-time configuration updates with hardware re-initialization
+
+**IOManager**: Hardware abstraction for industrial I/O
+- **Shift Register I/O**: 8 relay outputs + 8 digital inputs via 74HC595/74HC165
+- **Analog Inputs**: 6 channels (4x 0-20mA, 2x 0-10V) with signal conditioning
+- **Signal Processing**: SMA filtering, lookup tables, scaling, gain/offset
+- **Alarm System**: Rate of change, disconnection, stuck signal, max value detection
+- **Thread Safety**: FreeRTOS mutex protection for all I/O operations
+
+**ConfigController**: REST API for configuration management
+- `GET /api/config` - Retrieve complete IO configuration
+- `GET /api/config/io/{point_id}` - Get specific I/O point configuration
+- `PUT /api/config/io/{point_id}` - Update I/O point configuration
+- `POST /api/config/reload` - Reload configuration from storage
+- `GET /api/config/hardware` - Get shift register and hardware settings
+
+**IOController**: REST API for I/O control and monitoring
+- `GET /api/io/points` - List all configured I/O points
+- `GET /api/io/analog/{point_id}` - Get analog input value with conditioning
+- `PUT /api/io/binary/{point_id}` - Set binary output state (with safety checks)
+- `GET /api/io/alarms` - Get active alarm conditions
+- `GET /api/io/status` - Get comprehensive I/O system status
+
+**Hardware Architecture** (from existing JSON config):
+- **Shift Register Outputs**: 8 relays (SOLENOID/LIGHTING types) with flow calibration
+- **Shift Register Inputs**: 8 digital inputs with inversion support
+- **ADC Channels**: GPIO pins 32-36, 39 with sophisticated signal processing
+- **Signal Conditioning**: Per-channel filtering, scaling, alarm monitoring
+- **Safety Features**: Boot-time shutdown, manual override timeouts, interlocking
 
 **Success Criteria**:
-- Configuration accessible via web interface
-- Settings can be modified and applied
-- WiFi credentials configurable via web
-- Configuration changes persist during session
+- IO configuration JSON loaded and served via web API
+- Shift register I/O operational with thread-safe access
+- Analog inputs reading with signal conditioning applied
+- Alarm system monitoring all configured points
+- Configuration changes applied without system restart
+- All I/O operations integrated with existing monitoring systems
 
 **Files to Create**:
-- `include/config_manager.h`
-- `src/config_manager.c`
-- `include/config_controller.h`
-- `src/config_controller.c`
+- `include/config_manager.h` - Configuration management with IO schema support
+- `src/config_manager.c` - JSON loading, validation, and serving
+- `include/io_manager.h` - Hardware abstraction for shift registers and ADC
+- `src/io_manager.c` - I/O operations with signal processing and alarms
+- `include/config_controller.h` - Configuration REST API
+- `src/config_controller.c` - Configuration web endpoints
+- `include/io_controller.h` - I/O control REST API
+- `src/io_controller.c` - I/O monitoring and control endpoints
 
 ---
 
@@ -218,27 +254,13 @@ This document outlines the step-by-step implementation plan for building a sophi
 
 ---
 
-### Step 8: Storage Foundation
+### Step 8: Storage Foundation ✅ COMPLETE
 **Component**: StorageManager
-**Priority**: Medium
-
-**Implementation Details**:
-- SPIFFS/LittleFS initialization and management
-- File system operations (read, write, delete)
-- Configuration persistence
-- Log file storage and rotation
-- Data storage preparation for trending
-
-**Success Criteria**:
-- File system mounted and operational
-- Configuration persists across reboots
-- File operations work reliably
-- Storage space managed efficiently
-
-**Files to Create**:
-- `include/storage_manager.h`
-- `src/storage_manager.c`
-- File system initialization in main
+**Status**: Already implemented with LittleFS integration
+- Storage manager component operational
+- 256KB dedicated partition configured
+- File system operations working reliably
+- Ready for IO configuration persistence
 
 ---
 
@@ -291,32 +313,7 @@ This document outlines the step-by-step implementation plan for building a sophi
 
 ---
 
-### Step 11: Basic I/O Framework
-**Component**: IOManager + IOController (abstract)
-**Priority**: Low (Hardware-dependent)
-
-**Implementation Details**:
-- Generic I/O point abstraction
-- REST API framework for I/O control (`/api/io/*`)
-- Safety validation framework
-- Hardware abstraction layer
-- Preparation for specific hardware implementation
-
-**Success Criteria**:
-- I/O abstraction layer functional
-- REST API framework ready for hardware
-- Safety validation prevents conflicts
-- Hardware abstraction allows flexibility
-
-**Files to Create**:
-- `include/io_manager.h`
-- `src/io_manager.c`
-- `include/io_controller.h`
-- `src/io_controller.c`
-
----
-
-### Step 12: User Management
+### Step 11: User Management
 **Component**: UserController + UserManager
 **Priority**: Low
 
@@ -338,6 +335,50 @@ This document outlines the step-by-step implementation plan for building a sophi
 - `src/user_manager.c`
 - `include/user_controller.h`
 - `src/user_controller.c`
+
+---
+
+### Step 12: Advanced Irrigation Control
+**Component**: IrrigationManager + IrrigationController
+**Priority**: Medium (Elevated from previous Step 13)
+
+**Implementation Details**:
+- **IrrigationManager**: Core irrigation logic and scheduling
+  - Zone management based on BO configuration (SOLENOID types)
+  - Flow rate calculations using `lphPerEmitterFlow` and `numEmittersPerPlant`
+  - Volume-to-duration conversion for precise irrigation timing
+  - AutoPilot sensor integration for feedback-controlled irrigation
+  - Safety interlocks and emergency shutoff procedures
+  - Schedule execution with conflict resolution
+
+- **IrrigationController**: Irrigation-specific REST API
+  - `GET /api/irrigation/zones` - List all irrigation zones with status
+  - `PUT /api/irrigation/zones/{zone_id}/activate` - Manual zone control with safety checks
+  - `GET /api/irrigation/schedule` - Current irrigation schedule and next events
+  - `PUT /api/irrigation/schedule` - Update irrigation schedule with validation
+  - `GET /api/irrigation/sensors` - Sensor readings for irrigation decision-making
+  - `POST /api/irrigation/emergency-stop` - Emergency shutdown of all irrigation
+
+- **Advanced Features**:
+  - Integration with existing alarm system for sensor-based control
+  - Flow rate monitoring and leak detection via analog inputs
+  - Weather data integration for smart irrigation adjustment
+  - Historical irrigation data collection and analysis
+  - Mobile-friendly API for remote irrigation management
+
+**Success Criteria**:
+- Complete irrigation system control via web interface
+- Automated scheduling with sensor feedback integration
+- Safety systems prevent over-watering and equipment damage
+- Real-time monitoring of irrigation operations
+- Integration with existing I/O and alarm systems
+
+**Files to Create**:
+- `include/irrigation_manager.h`
+- `src/irrigation_manager.c`
+- `include/irrigation_controller.h`
+- `src/irrigation_controller.c`
+- Irrigation dashboard HTML/CSS/JS interface
 
 ## Implementation Principles
 

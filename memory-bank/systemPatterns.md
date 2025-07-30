@@ -191,3 +191,108 @@ HTTP Request → ESP-IDF HTTP Server → URI Handler → Controller → Manager 
 - Memory threshold callbacks for leak detection
 - Stack warning callbacks for overflow prevention
 - Web server task integration with existing monitoring
+
+## Industrial I/O Architecture Patterns
+
+### Discovered Architecture (January 30, 2025)
+**Source**: `io_config full_ES32D26 wEnabledProcessing.json` and `SNRv8_IO_Configuration_and_Processing_Architecture.md`
+
+### 1. Configuration-Driven Hardware Pattern
+**Pattern**: JSON configuration drives all hardware initialization and behavior
+- **Implementation**: Comprehensive JSON schema defining I/O points, signal processing, and alarm rules
+- **Key Features**:
+  - Hardware abstraction through configuration
+  - Runtime reconfiguration without code changes
+  - Type-safe I/O point definitions
+  - Validation and error checking
+
+### 2. Shift Register I/O Pattern
+**Pattern**: Scalable I/O expansion using shift register chains
+- **Hardware**: 74HC595 (outputs) + 74HC165 (inputs)
+- **Implementation**: Thread-safe bit manipulation with mutex protection
+- **Key Features**:
+  - 8 relay outputs (SOLENOID/LIGHTING types)
+  - 8 digital inputs with inversion support
+  - Atomic read/write operations
+  - Hardware timing requirements (5μs load pulse, 1μs clock transitions)
+
+### 3. Signal Processing Pipeline Pattern
+**Pattern**: Multi-stage signal conditioning for analog inputs
+- **Pipeline**: Raw ADC → Offset → Gain → Scaling → Lookup Table → Precision → Filtering
+- **Implementation**: Configurable per-channel processing
+- **Key Features**:
+  - SMA filtering with configurable window size
+  - Linear interpolation lookup tables
+  - Gain/offset compensation
+  - Precision control (decimal places)
+
+### 4. Alarm System Pattern
+**Pattern**: Multi-type alarm detection with state management
+- **Alarm Types**: Rate of change, disconnection, stuck signal, max value
+- **Implementation**: Historical analysis with configurable thresholds
+- **Key Features**:
+  - Persistence requirements (multiple samples)
+  - Hysteresis for alarm clearing
+  - Trust system for sensor reliability
+  - Manual reset capability
+
+### 5. Thread-Safe State Management Pattern
+**Pattern**: Centralized state repository with mutex protection
+- **Implementation**: IOStateManager with copy-based access
+- **Key Features**:
+  - Prevents lock contention through data copying
+  - Timeout-based mutex acquisition
+  - Separate configuration and runtime state maps
+  - Atomic state updates
+
+### 6. Hardware Abstraction Layer Pattern
+**Pattern**: Unified interface for different I/O types
+- **Types**: GPIO_AI, GPIO_BO, SHIFT_REG_BI, SHIFT_REG_BO
+- **Implementation**: Polymorphic I/O point handling
+- **Key Features**:
+  - Type-specific behavior (SOLENOID vs LIGHTING)
+  - Safety validation for outputs
+  - Calibration data integration
+  - Flow rate calculations
+
+### 7. Safety Interlock Pattern
+**Pattern**: Multi-level safety system for industrial control
+- **Implementation**: Boot-time shutdown, manual override timeouts, conflict detection
+- **Key Features**:
+  - Emergency stop functionality
+  - Configuration change safety protocols
+  - Manual override with automatic timeout
+  - Audit trail for all operations
+
+### 8. Real-Time Processing Pattern
+**Pattern**: Dedicated FreeRTOS tasks for time-critical operations
+- **Task Structure**:
+  - I/O Polling Task (1000ms) - Input reading and signal conditioning
+  - Alarm Processing Task (5000ms) - Alarm analysis and state management
+  - Schedule Executor Task (60000ms) - Irrigation control logic
+- **Key Features**:
+  - Priority-based task scheduling
+  - Yield calls prevent watchdog timeouts
+  - Resource-aware task design
+
+## Integration Architecture
+
+### Configuration + I/O Framework Integration (Step 6)
+**Pattern**: Combined configuration management and hardware control
+- **ConfigManager**: Loads and serves JSON configuration
+- **IOManager**: Implements hardware abstraction based on configuration
+- **Controllers**: REST APIs for configuration and I/O control
+- **Integration Points**:
+  - Configuration validation before hardware changes
+  - Runtime reconfiguration with safety checks
+  - Monitoring integration for all I/O operations
+  - Storage persistence for configuration changes
+
+### Web Server Integration Pattern
+**Pattern**: RESTful API for industrial I/O control
+- **Configuration API**: `/api/config/*` endpoints for configuration management
+- **I/O Control API**: `/api/io/*` endpoints for real-time control and monitoring
+- **Safety Integration**: All web operations subject to safety validation
+- **Real-Time Data**: WebSocket or polling for live I/O status
+
+This industrial-grade architecture represents a significant evolution from simple irrigation control to a comprehensive automation platform suitable for commercial applications.

@@ -83,27 +83,30 @@
 
 ### Phase 2: ESP32 Web Server Architecture (Steps 1-12)
 **Priority**: High - Foundation for all remote control and monitoring
-**Implementation Plan**: 12-step incremental approach
+**Implementation Plan**: 12-step incremental approach (REVISED)
 
-**Critical Foundation (Steps 1-3)**:
-- **Step 1**: WiFi Foundation - Connection management and monitoring integration
-- **Step 2**: Basic HTTP Server - ESPAsyncWebServer with monitoring integration
-- **Step 3**: Static File Controller - Web interface foundation with caching
+**Critical Foundation (Steps 1-5) ✅ COMPLETE**:
+- ✅ **Step 1**: WiFi Foundation - WiFiHandler/WiFiManager components exist
+- ✅ **Step 2**: HTTP Server - WebServerManager with ESP-IDF HTTP Server
+- ✅ **Step 3**: Static File Controller - Advanced caching system implemented
+- ✅ **Step 4**: Authentication Foundation - AuthManager + AuthController components exist
+- ✅ **Step 5**: System Monitoring - SystemController component exists
 
-**Core Web Services (Steps 4-6)**:
-- **Step 4**: Authentication Foundation - Session-based auth with RBAC
-- **Step 5**: System Monitoring Web Interface - Real-time dashboard APIs
-- **Step 6**: Configuration Management - Web-based settings with persistence
+**Current Priority (Step 6)**:
+- **Step 6**: Configuration Management + I/O Framework (Combined Priority Step)
+  - ConfigManager: Load sophisticated IO configuration JSON
+  - IOManager: Shift register I/O + analog inputs with signal conditioning
+  - ConfigController: REST API for configuration management
+  - IOController: REST API for I/O control and monitoring
+  - Hardware: 8 relays + 8 digital inputs + 6 analog inputs with alarm system
 
-**Performance & Storage (Steps 7-8)**:
+**Performance & Advanced Features (Steps 7-12)**:
 - **Step 7**: Request Priority Management - Load balancing and timeout prevention
-- **Step 8**: ✅ Storage Foundation - SPIFFS/LittleFS for data persistence
-
-**Advanced Features (Steps 9-12)**:
+- **Step 8**: ✅ Storage Foundation - LittleFS integration complete
 - **Step 9**: Event Logging System - Web-based log viewing
 - **Step 10**: Dashboard Controller - Real-time monitoring with client-side processing
-- **Step 11**: Basic I/O Framework - Hardware abstraction for irrigation control
-- **Step 12**: User Management - Complete RBAC system
+- **Step 11**: User Management - Complete RBAC system
+- **Step 12**: Advanced Irrigation Control - Zone management with sensor feedback
 
 ### Phase 3: Irrigation Control Integration
 **Priority**: Medium (after web server foundation)
