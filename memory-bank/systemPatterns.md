@@ -2,19 +2,235 @@
 
 ## System Architecture Overview
 
-### Layered Architecture
+### Component-Based Architecture (Updated January 30, 2025)
 ```
-┌─────────────────────────────────────────┐
-│           Application Layer             │
-│  (Irrigation Logic, Web Server, etc.)  │
-├─────────────────────────────────────────┤
-│          Monitoring Layer               │
-│   (Memory Monitor, Task Tracker)       │
-├─────────────────────────────────────────┤
-│           Hardware Layer                │
-│    (ESP-IDF, FreeRTOS, Hardware)       │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     Application Layer                          │
+│              (Irrigation Logic, Web APIs)                      │
+├─────────────────────────────────────────────────────────────────┤
+│                   Component Layer                              │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│  │    WEB      │ │   NETWORK   │ │   STORAGE   │ │    CORE     │ │
+│  │ Component   │ │ Component   │ │ Component   │ │ Component   │ │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+├─────────────────────────────────────────────────────────────────┤
+│                   Hardware Layer                               │
+│              (ESP-IDF, FreeRTOS, Hardware)                     │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+### Component Dependencies
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│    WEB      │───▶│   STORAGE   │───▶│    CORE     │
+│ Component   │    │ Component   │    │ Component   │
+└─────────────┘    └─────────────┘    └─────────────┘
+       │                                      ▲
+       │           ┌─────────────┐            │
+       └──────────▶│   NETWORK   │────────────┘
+                   │ Component   │
+                   └─────────────┘
+```
+**Dependency Rules**:
+- **CORE**: No dependencies (base component)
+- **NETWORK**: Depends on CORE
+- **STORAGE**: Depends on CORE  
+- **WEB**: Depends on CORE, STORAGE, NETWORK
+
+## Component Filesystem Organization (January 30, 2025)
+
+### Directory Structure
+```
+components/
+├── core/
+│   ├── CMakeLists.txt
+│   ├── README.md
+│   ├── include/
+│   │   ├── debug_config.h
+│   │   ├── memory_monitor.h
+│   │   └── task_tracker.h
+│   ├── memory_monitor.c
+│   └── task_tracker.c
+├── network/
+│   ├── CMakeLists.txt
+│   ├── README.md
+│   ├── include/
+│   │   ├── debug_config.h (copy)
+│   │   └── wifi_handler.h
+│   └── wifi_handler.c
+├── storage/
+│   ├── CMakeLists.txt
+│   ├── README.md
+│   ├── include/
+│   │   ├── auth_manager.h
+│   │   ├── debug_config.h (copy)
+│   │   └── storage_manager.h
+│   ├── auth_manager.c
+│   └── storage_manager.c
+└── web/
+    ├── CMakeLists.txt
+    ├── README.md
+    ├── include/
+    │   ├── auth_controller.h
+    │   ├── debug_config.h (copy)
+    │   ├── static_file_controller.h
+    │   ├── system_controller.h
+    │   └── web_server_manager.h
+    ├── auth_controller.c
+    ├── static_file_controller.c
+    ├── system_controller.c
+    └── web_server_manager.c
+```
+
+### Component Responsibilities
+
+#### CORE Component
+**Purpose**: Foundation monitoring and debugging infrastructure
+**Files**:
+- `memory_monitor.c/h`: Heap usage tracking and leak detection
+- `task_tracker.c/h`: FreeRTOS task monitoring and stack analysis
+- `debug_config.h`: Master configuration for all debug output
+
+**CMakeLists.txt Configuration**:
+```cmake
+idf_component_register(
+    SRCS "memory_monitor.c" "task_tracker.c"
+    INCLUDE_DIRS "include"
+    REQUIRES "freertos" "esp_timer" "esp_system"
+)
+```
+
+#### NETWORK Component
+**Purpose**: WiFi connectivity and network management
+**Files**:
+- `wifi_handler.c/h`: WiFi station mode with auto-reconnection
+- `debug_config.h`: Local copy for component independence
+
+**CMakeLists.txt Configuration**:
+```cmake
+idf_component_register(
+    SRCS "wifi_handler.c"
+    INCLUDE_DIRS "include"
+    REQUIRES "core" "esp_wifi" "esp_netif" "esp_event" "nvs_flash" "lwip" "esp_timer" "esp_system"
+)
+```
+
+#### STORAGE Component
+**Purpose**: Filesystem and authentication management
+**Files**:
+- `storage_manager.c/h`: LittleFS filesystem abstraction
+- `auth_manager.c/h`: Session-based authentication system
+- `debug_config.h`: Local copy for component independence
+
+**CMakeLists.txt Configuration**:
+```cmake
+idf_component_register(
+    SRCS "storage_manager.c" "auth_manager.c"
+    INCLUDE_DIRS "include"
+    REQUIRES "core" "esp_littlefs" "nvs_flash" "esp_partition" "esp_timer" "esp_system"
+)
+```
+
+#### WEB Component
+**Purpose**: HTTP server and web API implementation
+**Files**:
+- `web_server_manager.c/h`: ESP-IDF HTTP server lifecycle management
+- `static_file_controller.c/h`: Static file serving with advanced caching
+- `system_controller.c/h`: System status and monitoring APIs
+- `auth_controller.c/h`: Authentication endpoints
+- `debug_config.h`: Local copy for component independence
+
+**CMakeLists.txt Configuration**:
+```cmake
+idf_component_register(
+    SRCS "web_server_manager.c" "static_file_controller.c" "system_controller.c" "auth_controller.c"
+    INCLUDE_DIRS "include"
+    REQUIRES "esp_http_server" "esp_littlefs" "json" "core" "storage" "network" "esp_timer" "esp_system" "esp_wifi"
+)
+```
+
+### Critical Implementation Details
+
+#### Debug Configuration Management
+**Issue Resolved**: Duplicate `debug_config.h` files caused compilation conflicts
+**Solution**: Each component maintains its own copy of `debug_config.h`
+**Rationale**: 
+- Ensures component independence during development
+- Prevents cross-component include path issues
+- Allows per-component debug configuration if needed
+- Simplifies build system configuration
+
+#### Component Dependency Resolution
+**Pattern**: ESP-IDF component system with explicit REQUIRES declarations
+**Implementation**:
+- Each component declares dependencies in CMakeLists.txt
+- Build system automatically resolves include paths
+- Circular dependencies prevented by design
+- Clean separation of concerns
+
+#### File Organization Principles
+1. **Single Responsibility**: Each component has a clear, focused purpose
+2. **Dependency Hierarchy**: Dependencies flow in one direction (no cycles)
+3. **Include Isolation**: Each component's headers are self-contained
+4. **Build Independence**: Components can be built and tested separately
+
+### Migration Notes (January 30, 2025)
+
+#### Files Moved During Reorganization
+**From `src/` to Components**:
+- `memory_monitor.c` → `components/core/memory_monitor.c`
+- `task_tracker.c` → `components/core/task_tracker.c`
+- `wifi_handler.c` → `components/network/wifi_handler.c`
+- `storage_manager.c` → `components/storage/storage_manager.c`
+- `auth_manager.c` → `components/storage/auth_manager.c`
+- `web_server_manager.c` → `components/web/web_server_manager.c`
+- `static_file_controller.c` → `components/web/static_file_controller.c`
+- `system_controller.c` → `components/web/system_controller.c`
+- `auth_controller.c` → `components/web/auth_controller.c`
+
+**From `include/` to Component Includes**:
+- `memory_monitor.h` → `components/core/include/memory_monitor.h`
+- `task_tracker.h` → `components/core/include/task_tracker.h`
+- `wifi_handler.h` → `components/network/include/wifi_handler.h`
+- `storage_manager.h` → `components/storage/include/storage_manager.h`
+- `auth_manager.h` → `components/storage/include/auth_manager.h`
+- `web_server_manager.h` → `components/web/include/web_server_manager.h`
+- `static_file_controller.h` → `components/web/include/static_file_controller.h`
+- `system_controller.h` → `components/web/include/system_controller.h`
+- `auth_controller.h` → `components/web/include/auth_controller.h`
+
+#### Build System Validation
+**Compilation Test Results**:
+- Memory Usage: RAM: 14.4% (47,204 bytes), Flash: 34.7% (978,667 bytes)
+- All components compile successfully
+- No circular dependency issues
+- All include paths resolved correctly
+
+### Future Development Guidelines
+
+#### Adding New Components
+1. Create component directory under `components/`
+2. Add `CMakeLists.txt` with proper REQUIRES declarations
+3. Create `include/` subdirectory for headers
+4. Add `README.md` documenting component purpose
+5. Copy `debug_config.h` if debug output needed
+6. Test compilation after each file addition
+
+#### Modifying Existing Components
+1. Respect component boundaries - avoid cross-component file access
+2. Update CMakeLists.txt if adding new dependencies
+3. Test compilation after changes
+4. Update component README.md if interface changes
+5. Maintain debug_config.h consistency across components
+
+#### Component Interface Design
+1. Keep public APIs minimal and focused
+2. Use proper include guards in all headers
+3. Document all public functions with Doxygen comments
+4. Avoid exposing internal data structures
+5. Design for testability and modularity
+
+This component architecture provides a solid foundation for future development while maintaining the existing functionality and performance characteristics.
 
 ### Core Design Patterns
 
