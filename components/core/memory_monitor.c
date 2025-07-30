@@ -4,6 +4,7 @@
  */
 
 #include "memory_monitor.h"
+#include "debug_config.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"

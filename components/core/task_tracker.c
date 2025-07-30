@@ -4,6 +4,7 @@
  */
 
 #include "task_tracker.h"
+#include "debug_config.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
