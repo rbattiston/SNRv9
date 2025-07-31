@@ -103,6 +103,19 @@ Idle Priority (0): IDLE tasks (system)
 **Critical Pattern**: Always validate stack size (2048+ bytes) and use proper task creation APIs for ESP32
 **Production Impact**: PSRAM system now stable with 100% allocation success rate and comprehensive monitoring
 
+### Web Server Stack Configuration Critical Fix (January 30, 2025)
+**Challenge**: Compilation error in web server manager preventing system build
+**Root Cause**: `httpd_config_t` structure member `ctrl_stack_size` does not exist in ESP-IDF 5.4.1
+**Error**: `error: 'httpd_config_t' has no member named 'ctrl_stack_size'`
+**Solution**:
+- Removed invalid `config.ctrl_stack_size` assignment
+- Used direct `config.stack_size = 4096` assignment for reliable configuration
+- Updated debug logging to remove reference to non-existent member
+- Verified successful compilation and web server operation
+**Lesson**: ESP-IDF documentation requires careful verification against actual API versions - structure members change between versions
+**Critical Pattern**: Simple hardcoded values often more reliable than complex configuration chains for critical system parameters
+**Production Impact**: Web server foundation now fully operational with proper 4096-byte stack configuration
+
 ### Thread Safety in Monitoring
 **Challenge**: Multiple tasks accessing shared monitoring data
 **Solution**:

@@ -223,28 +223,78 @@ esp_err_t system_info_handler(httpd_req_t *req)
 
 esp_err_t system_memory_handler(httpd_req_t *req)
 {
-    static char response_buffer[512];
+    static char response_buffer[1024]; // Increased buffer for enhanced stats
     
     // Set headers directly
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_type(req, "application/json");
     
-    // Get memory info safely
-    uint32_t free_heap = esp_get_free_heap_size();
-    uint32_t min_free_heap = esp_get_minimum_free_heap_size();
+    // Try to get enhanced memory statistics with PSRAM info
+    enhanced_memory_stats_t enhanced_stats;
+    bool has_enhanced = memory_monitor_get_enhanced_stats(&enhanced_stats);
     
-    // Build safe memory status JSON
-    snprintf(response_buffer, sizeof(response_buffer),
-        "{\n"
-        "  \"heap\": {\n"
-        "    \"free\": %lu,\n"
-        "    \"min_free\": %lu\n"
-        "  },\n"
-        "  \"message\": \"Memory status available\"\n"
-        "}",
-        (unsigned long)free_heap,
-        (unsigned long)min_free_heap
-    );
+    if (has_enhanced) {
+        // Build comprehensive memory status JSON with PSRAM
+        snprintf(response_buffer, sizeof(response_buffer),
+            "{\n"
+            "  \"timestamp\": %lu,\n"
+            "  \"internal_ram\": {\n"
+            "    \"free\": %lu,\n"
+            "    \"total\": %lu,\n"
+            "    \"usage_percent\": %d,\n"
+            "    \"min_free\": %lu,\n"
+            "    \"largest_block\": %lu\n"
+            "  },\n"
+            "  \"psram\": {\n"
+            "    \"available\": %s,\n"
+            "    \"free\": %lu,\n"
+            "    \"total\": %lu,\n"
+            "    \"usage_percent\": %d,\n"
+            "    \"min_free\": %lu,\n"
+            "    \"largest_block\": %lu\n"
+            "  },\n"
+            "  \"total_memory\": {\n"
+            "    \"free\": %lu,\n"
+            "    \"total\": %lu,\n"
+            "    \"usage_percent\": %d\n"
+            "  },\n"
+            "  \"memory_pressure\": %d,\n"
+            "  \"message\": \"Enhanced memory status with PSRAM\"\n"
+            "}",
+            (unsigned long)enhanced_stats.timestamp_ms,
+            (unsigned long)enhanced_stats.internal_free,
+            (unsigned long)enhanced_stats.internal_total,
+            enhanced_stats.internal_usage_percent,
+            (unsigned long)enhanced_stats.internal_minimum_free,
+            (unsigned long)enhanced_stats.internal_largest_block,
+            enhanced_stats.psram_total > 0 ? "true" : "false",
+            (unsigned long)enhanced_stats.psram_free,
+            (unsigned long)enhanced_stats.psram_total,
+            enhanced_stats.psram_usage_percent,
+            (unsigned long)enhanced_stats.psram_minimum_free,
+            (unsigned long)enhanced_stats.psram_largest_block,
+            (unsigned long)enhanced_stats.total_free_memory,
+            (unsigned long)enhanced_stats.total_memory,
+            enhanced_stats.total_usage_percent,
+            memory_monitor_check_memory_pressure()
+        );
+    } else {
+        // Fallback to basic memory info
+        uint32_t free_heap = esp_get_free_heap_size();
+        uint32_t min_free_heap = esp_get_minimum_free_heap_size();
+        
+        snprintf(response_buffer, sizeof(response_buffer),
+            "{\n"
+            "  \"heap\": {\n"
+            "    \"free\": %lu,\n"
+            "    \"min_free\": %lu\n"
+            "  },\n"
+            "  \"message\": \"Basic memory status (enhanced stats unavailable)\"\n"
+            "}",
+            (unsigned long)free_heap,
+            (unsigned long)min_free_heap
+        );
+    }
     
     return httpd_resp_send(req, response_buffer, HTTPD_RESP_USE_STRLEN);
 }

@@ -4,6 +4,8 @@
  */
 
 #include "memory_monitor.h"
+#include "psram_manager.h"
+#include "psram_test_suite.h"
 #include "debug_config.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -370,7 +372,7 @@ static void memory_monitor_task(void *pvParameters)
 {
     (void)pvParameters;
 
-    ESP_LOGI(TAG, "Memory monitor task started");
+    ESP_LOGI(TAG, "Memory monitor task started with PSRAM integration");
 
     while (g_mem_monitor.status == MEMORY_MONITOR_RUNNING) {
         uint32_t current_time = GET_TIMESTAMP();
@@ -390,7 +392,18 @@ static void memory_monitor_task(void *pvParameters)
             memory_stats_t stats;
             collect_memory_stats(&stats);
             print_memory_report(&stats);
+            
+            // Also run PSRAM tests periodically
+            memory_monitor_run_psram_tests();
+            
             g_mem_monitor.last_report_time = current_time;
+        }
+
+        // Check memory pressure and log warnings
+        uint8_t pressure = memory_monitor_check_memory_pressure();
+        if (pressure >= 3) { // HIGH or CRITICAL
+            ESP_LOGW(TAG, "Memory pressure level: %s", 
+                     pressure == 4 ? "CRITICAL" : "HIGH");
         }
 
         // Sleep for a short time to prevent busy waiting
@@ -485,4 +498,182 @@ static const char* format_bytes(uint32_t bytes, char *buffer, size_t buffer_size
     }
 
     return buffer;
+}
+
+/* =============================================================================
+ * PSRAM INTEGRATION FUNCTION IMPLEMENTATIONS
+ * =============================================================================
+ */
+
+bool memory_monitor_get_enhanced_stats(enhanced_memory_stats_t *stats)
+{
+    if (stats == NULL) {
+        return false;
+    }
+
+    // Get enhanced stats from PSRAM manager
+    return psram_manager_get_enhanced_stats(stats);
+}
+
+void memory_monitor_print_comprehensive_report(void)
+{
+    if (!g_mem_monitor.enabled) {
+        return;
+    }
+
+    enhanced_memory_stats_t enhanced_stats;
+    psram_info_t psram_info;
+    char buffer[32];
+    uint32_t timestamp = GET_TIMESTAMP();
+
+    printf(TIMESTAMP_FORMAT "%s: === COMPREHENSIVE MEMORY REPORT ===\n", 
+           FORMAT_TIMESTAMP(timestamp), TAG);
+
+    // Get enhanced memory statistics
+    if (memory_monitor_get_enhanced_stats(&enhanced_stats)) {
+        printf(TIMESTAMP_FORMAT "%s: INTERNAL RAM:\n", FORMAT_TIMESTAMP(timestamp), TAG);
+        printf(TIMESTAMP_FORMAT "%s:   Free: %s, Usage: %d%%\n", 
+               FORMAT_TIMESTAMP(timestamp), TAG,
+               format_bytes(enhanced_stats.internal_free, buffer, sizeof(buffer)),
+               enhanced_stats.internal_usage_percent);
+        
+        printf(TIMESTAMP_FORMAT "%s:   Min Free: %s, Largest Block: %s\n", 
+               FORMAT_TIMESTAMP(timestamp), TAG,
+               format_bytes(enhanced_stats.internal_minimum_free, buffer, sizeof(buffer)),
+               format_bytes(enhanced_stats.internal_largest_block, buffer, sizeof(buffer)));
+
+        if (psram_manager_is_available()) {
+            printf(TIMESTAMP_FORMAT "%s: PSRAM:\n", FORMAT_TIMESTAMP(timestamp), TAG);
+            printf(TIMESTAMP_FORMAT "%s:   Free: %s, Usage: %d%%\n", 
+                   FORMAT_TIMESTAMP(timestamp), TAG,
+                   format_bytes(enhanced_stats.psram_free, buffer, sizeof(buffer)),
+                   enhanced_stats.psram_usage_percent);
+            
+            printf(TIMESTAMP_FORMAT "%s:   Min Free: %s, Largest Block: %s\n", 
+                   FORMAT_TIMESTAMP(timestamp), TAG,
+                   format_bytes(enhanced_stats.psram_minimum_free, buffer, sizeof(buffer)),
+                   format_bytes(enhanced_stats.psram_largest_block, buffer, sizeof(buffer)));
+        }
+
+        printf(TIMESTAMP_FORMAT "%s: TOTAL MEMORY:\n", FORMAT_TIMESTAMP(timestamp), TAG);
+        printf(TIMESTAMP_FORMAT "%s:   Free: %s, Usage: %d%%\n", 
+               FORMAT_TIMESTAMP(timestamp), TAG,
+               format_bytes(enhanced_stats.total_free_memory, buffer, sizeof(buffer)),
+               enhanced_stats.total_usage_percent);
+    }
+
+    // Get PSRAM allocation statistics
+    if (memory_monitor_get_psram_stats(&psram_info)) {
+        printf(TIMESTAMP_FORMAT "%s: PSRAM ALLOCATION STATS:\n", FORMAT_TIMESTAMP(timestamp), TAG);
+        printf(TIMESTAMP_FORMAT "%s:   Allocations: %lu, Failures: %lu, Fallbacks: %lu\n", 
+               FORMAT_TIMESTAMP(timestamp), TAG,
+               (unsigned long)psram_info.psram_allocations,
+               (unsigned long)psram_info.psram_failures,
+               (unsigned long)psram_info.fallback_allocations);
+        
+        if (psram_info.psram_allocations > 0) {
+            uint32_t success_rate = (psram_info.psram_allocations * 100) / 
+                                   (psram_info.psram_allocations + psram_info.psram_failures);
+            printf(TIMESTAMP_FORMAT "%s:   Success Rate: %lu%%\n", 
+                   FORMAT_TIMESTAMP(timestamp), TAG, (unsigned long)success_rate);
+        }
+    }
+
+    // Check memory pressure
+    uint8_t pressure = memory_monitor_check_memory_pressure();
+    const char* pressure_str[] = {"NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"};
+    printf(TIMESTAMP_FORMAT "%s: Memory Pressure: %s\n", 
+           FORMAT_TIMESTAMP(timestamp), TAG, 
+           pressure < 5 ? pressure_str[pressure] : "UNKNOWN");
+
+    printf(TIMESTAMP_FORMAT "%s: =====================================\n", 
+           FORMAT_TIMESTAMP(timestamp), TAG);
+}
+
+bool memory_monitor_psram_health_check(void)
+{
+    if (!psram_manager_is_available()) {
+        return true; // No PSRAM, so health check passes
+    }
+
+    // Use PSRAM manager's health check
+    return psram_manager_health_check();
+}
+
+void memory_monitor_run_psram_tests(void)
+{
+    static uint32_t last_quick_test = 0;
+    static uint32_t last_comprehensive_test = 0;
+    
+    if (!psram_manager_is_available()) {
+        return; // No PSRAM available
+    }
+
+    uint32_t current_time = GET_TIMESTAMP() / 1000; // Convert to seconds
+    
+    // Quick test every 5 minutes (300 seconds)
+    if (current_time - last_quick_test >= 300) {
+        bool quick_result = psram_quick_test();
+        if (quick_result) {
+            ESP_LOGI(TAG, "PSRAM quick test: PASS");
+        } else {
+            ESP_LOGW(TAG, "PSRAM quick test: FAIL");
+        }
+        last_quick_test = current_time;
+    }
+    
+    // Comprehensive test every 30 minutes (1800 seconds)
+    if (current_time - last_comprehensive_test >= 1800) {
+        bool comprehensive_result = psram_run_comprehensive_test_suite();
+        if (comprehensive_result) {
+            ESP_LOGI(TAG, "PSRAM comprehensive test: PASS");
+        } else {
+            ESP_LOGW(TAG, "PSRAM comprehensive test: FAIL");
+        }
+        last_comprehensive_test = current_time;
+    }
+}
+
+uint8_t memory_monitor_check_memory_pressure(void)
+{
+    enhanced_memory_stats_t stats;
+    if (!memory_monitor_get_enhanced_stats(&stats)) {
+        return 0; // No pressure if we can't get stats
+    }
+
+    // Check internal RAM pressure (most critical)
+    uint8_t internal_pressure = 0;
+    if (stats.internal_usage_percent >= 95) {
+        internal_pressure = 4; // CRITICAL
+    } else if (stats.internal_usage_percent >= 90) {
+        internal_pressure = 3; // HIGH
+    } else if (stats.internal_usage_percent >= 80) {
+        internal_pressure = 2; // MEDIUM
+    } else if (stats.internal_usage_percent >= 70) {
+        internal_pressure = 1; // LOW
+    }
+
+    // Check PSRAM pressure (less critical but still important)
+    uint8_t psram_pressure = 0;
+    if (psram_manager_is_available()) {
+        if (stats.psram_usage_percent >= 95) {
+            psram_pressure = 3; // HIGH (not critical since we can fall back to internal)
+        } else if (stats.psram_usage_percent >= 85) {
+            psram_pressure = 2; // MEDIUM
+        } else if (stats.psram_usage_percent >= 75) {
+            psram_pressure = 1; // LOW
+        }
+    }
+
+    // Return the higher pressure level
+    return (internal_pressure > psram_pressure) ? internal_pressure : psram_pressure;
+}
+
+bool memory_monitor_get_psram_stats(psram_info_t *info)
+{
+    if (info == NULL) {
+        return false;
+    }
+
+    return psram_manager_get_info(info);
 }

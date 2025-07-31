@@ -14,6 +14,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "debug_config.h"
+#include "psram_manager.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -203,6 +204,67 @@ void memory_monitor_print_trend_graph(void);
  * @return true if potential leak detected, false otherwise
  */
 bool memory_monitor_check_for_leaks(void);
+
+/* =============================================================================
+ * PSRAM INTEGRATION FUNCTIONS
+ * =============================================================================
+ */
+
+/**
+ * @brief Get enhanced memory statistics including PSRAM
+ * 
+ * Retrieves comprehensive memory statistics covering both internal RAM
+ * and PSRAM usage, fragmentation, and health status.
+ * 
+ * @param stats Pointer to structure to receive enhanced stats
+ * @return true if stats retrieved successfully, false otherwise
+ */
+bool memory_monitor_get_enhanced_stats(enhanced_memory_stats_t *stats);
+
+/**
+ * @brief Print comprehensive memory report including PSRAM
+ * 
+ * Outputs detailed memory information covering internal RAM, PSRAM,
+ * allocation statistics, and health status.
+ */
+void memory_monitor_print_comprehensive_report(void);
+
+/**
+ * @brief Perform PSRAM health check
+ * 
+ * Executes PSRAM functionality tests and reports health status.
+ * 
+ * @return true if PSRAM is healthy, false if issues detected
+ */
+bool memory_monitor_psram_health_check(void);
+
+/**
+ * @brief Run periodic PSRAM tests
+ * 
+ * Executes scheduled PSRAM tests based on configured intervals.
+ * Called automatically by the monitoring task.
+ */
+void memory_monitor_run_psram_tests(void);
+
+/**
+ * @brief Check unified memory pressure
+ * 
+ * Analyzes both internal RAM and PSRAM usage to determine
+ * overall memory pressure level.
+ * 
+ * @return Memory pressure level (0=none, 1=low, 2=medium, 3=high, 4=critical)
+ */
+uint8_t memory_monitor_check_memory_pressure(void);
+
+/**
+ * @brief Get PSRAM allocation statistics
+ * 
+ * Retrieves PSRAM allocation success/failure rates and usage patterns.
+ * 
+ * @param info Pointer to structure to receive PSRAM info
+ * @return true if info retrieved successfully, false otherwise
+ */
+bool memory_monitor_get_psram_stats(psram_info_t *info);
 
 #ifdef __cplusplus
 }

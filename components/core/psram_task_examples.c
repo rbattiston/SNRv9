@@ -122,7 +122,7 @@ bool psram_create_web_server_task_example(void)
     psram_task_config_t config = {
         .task_function = web_server_task_example,
         .task_name = "web_server_psram",
-        .stack_size = 8192,  // Large stack for web server
+        .stack_size = 4096,  // Optimized stack size for web server
         .parameters = NULL,
         .priority = 5,
         .task_handle = NULL,
