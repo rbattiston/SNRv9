@@ -14,6 +14,8 @@
 #include "memory_monitor.h"
 #include "task_tracker.h"
 #include "psram_manager.h"
+#include "psram_task_examples.h"
+#include "psram_test_suite.h"
 #include "wifi_handler.h"
 #include "web_server_manager.h"
 #include "auth_manager.h"
@@ -38,6 +40,119 @@ static void on_task_created(const task_info_t *task)
 static void on_task_deleted(const task_info_t *task)
 {
     ESP_LOGI(TAG, "Task deleted: %s", task->name);
+}
+
+/**
+ * @brief Comprehensive PSRAM functionality test
+ * 
+ * This function performs a thorough test of PSRAM capabilities including:
+ * - PSRAM detection and availability
+ * - Allocation strategy testing
+ * - Task creation with PSRAM stacks
+ * - Memory usage monitoring
+ * - Performance validation
+ */
+static void run_psram_comprehensive_test(void)
+{
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "    PSRAM COMPREHENSIVE TEST SUITE");
+    ESP_LOGI(TAG, "========================================");
+    
+    // Phase 1: Basic PSRAM Detection
+    ESP_LOGI(TAG, "Phase 1: PSRAM Detection and Availability");
+    ESP_LOGI(TAG, "----------------------------------------");
+    
+    if (psram_manager_is_available()) {
+        ESP_LOGI(TAG, "✓ PSRAM is available and functional");
+        
+        psram_info_t info;
+        if (psram_manager_get_info(&info)) {
+            ESP_LOGI(TAG, "✓ PSRAM Total Size: %u KB", 
+                     (unsigned int)(info.psram_total_size / 1024));
+            ESP_LOGI(TAG, "✓ PSRAM Free Size: %u KB", 
+                     (unsigned int)(info.psram_free_size / 1024));
+            ESP_LOGI(TAG, "✓ PSRAM Largest Block: %u KB", 
+                     (unsigned int)(info.psram_largest_block / 1024));
+        }
+    } else {
+        ESP_LOGW(TAG, "⚠ PSRAM not available - tests will use internal RAM");
+    }
+    
+    // Phase 2: Allocation Strategy Testing
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Phase 2: Allocation Strategy Testing");
+    ESP_LOGI(TAG, "------------------------------------");
+    psram_demonstrate_allocation_strategies();
+    
+    // Phase 3: Memory Statistics Before Task Creation
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Phase 3: Memory Statistics (Before Task Creation)");
+    ESP_LOGI(TAG, "------------------------------------------------");
+    psram_show_usage_example();
+    
+    // Phase 4: Task Creation Testing
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Phase 4: PSRAM Task Creation Testing");
+    ESP_LOGI(TAG, "------------------------------------");
+    
+    // Test critical task creation (should use internal RAM)
+    ESP_LOGI(TAG, "Creating critical task (internal RAM)...");
+    if (psram_create_critical_task_example()) {
+        ESP_LOGI(TAG, "✓ Critical task created successfully");
+    } else {
+        ESP_LOGE(TAG, "✗ Critical task creation failed");
+    }
+    
+    vTaskDelay(pdMS_TO_TICKS(2000)); // Let task run and complete
+    
+    // Test data processing task (should use PSRAM if available)
+    ESP_LOGI(TAG, "Creating data processing task (PSRAM preferred)...");
+    if (psram_create_data_processing_task_example()) {
+        ESP_LOGI(TAG, "✓ Data processing task created successfully");
+    } else {
+        ESP_LOGE(TAG, "✗ Data processing task creation failed");
+    }
+    
+    vTaskDelay(pdMS_TO_TICKS(3000)); // Let task run and complete
+    
+    // Test web server task (should use PSRAM if available)
+    ESP_LOGI(TAG, "Creating web server task (PSRAM preferred)...");
+    if (psram_create_web_server_task_example()) {
+        ESP_LOGI(TAG, "✓ Web server task created successfully");
+    } else {
+        ESP_LOGE(TAG, "✗ Web server task creation failed");
+    }
+    
+    vTaskDelay(pdMS_TO_TICKS(3000)); // Let task run and complete
+    
+    // Phase 5: Memory Statistics After Task Creation
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Phase 5: Memory Statistics (After Task Creation)");
+    ESP_LOGI(TAG, "-----------------------------------------------");
+    psram_show_usage_example();
+    
+    // Phase 6: PSRAM Health Check
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Phase 6: PSRAM Health Check");
+    ESP_LOGI(TAG, "---------------------------");
+    if (psram_manager_health_check()) {
+        ESP_LOGI(TAG, "✓ PSRAM health check passed");
+    } else {
+        ESP_LOGW(TAG, "⚠ PSRAM health check failed");
+    }
+    
+    // Phase 7: Allocation Statistics
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Phase 7: Final Allocation Statistics");
+    ESP_LOGI(TAG, "-----------------------------------");
+    psram_manager_print_allocation_stats();
+    
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "    PSRAM TEST SUITE COMPLETED");
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "");
 }
 
 void app_main(void)
@@ -146,6 +261,11 @@ void app_main(void)
     }
     
     ESP_LOGI(TAG, "All systems started successfully");
+    
+    // Run comprehensive PSRAM test suite
+    ESP_LOGI(TAG, "Running PSRAM comprehensive test suite...");
+    run_psram_comprehensive_test();
+    
     ESP_LOGI(TAG, "WiFi connecting to S3CURE_WIFI...");
     
     // Wait for WiFi connection before starting web server

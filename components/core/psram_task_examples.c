@@ -9,6 +9,7 @@
 #include "psram_manager.h"
 #include "debug_config.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>

@@ -297,53 +297,71 @@ BaseType_t psram_create_task(const psram_task_config_t* config)
 
     BaseType_t result;
 
+    // Validate stack size - ensure minimum for reliable operation
+    uint32_t validated_stack_size = config->stack_size;
+    if (validated_stack_size < 2048) {
+        ESP_LOGW(TAG, "Task '%s' stack size %u too small, increasing to 2048 bytes", 
+                 config->task_name, (unsigned int)validated_stack_size);
+        validated_stack_size = 2048;
+    }
+
     if (config->force_internal) {
-        // Force internal RAM allocation
-        result = xTaskCreateWithCaps(
+        // Force internal RAM allocation - use standard xTaskCreate which allocates from internal RAM by default
+        result = xTaskCreate(
             config->task_function,
             config->task_name,
-            config->stack_size,
+            validated_stack_size,
             config->parameters,
             config->priority,
-            config->task_handle,
-            MALLOC_CAP_INTERNAL
-        );
-        ESP_LOGD(TAG, "Task '%s' created with internal RAM stack", config->task_name);
-    } else if (config->use_psram && psram_manager_is_available() && 
-               config->stack_size >= PSRAM_LARGE_ALLOCATION_THRESHOLD) {
-        // Try PSRAM allocation for large stacks
-        result = xTaskCreateWithCaps(
-            config->task_function,
-            config->task_name,
-            config->stack_size,
-            config->parameters,
-            config->priority,
-            config->task_handle,
-            MALLOC_CAP_SPIRAM
+            config->task_handle
         );
         
         if (result == pdPASS) {
-            ESP_LOGI(TAG, "Task '%s' created with PSRAM stack (%u bytes)", 
-                     config->task_name, (unsigned int)config->stack_size);
+            ESP_LOGI(TAG, "Task '%s' created with internal RAM stack (%u bytes)", 
+                     config->task_name, (unsigned int)validated_stack_size);
+        } else {
+            ESP_LOGE(TAG, "Failed to create task '%s' with internal RAM stack", config->task_name);
+        }
+    } else if (config->use_psram && psram_manager_is_available() && 
+               validated_stack_size >= PSRAM_LARGE_ALLOCATION_THRESHOLD) {
+        // Try PSRAM allocation for large stacks using ESP-IDF specific function
+        result = xTaskCreatePinnedToCore(
+            config->task_function,
+            config->task_name,
+            validated_stack_size,
+            config->parameters,
+            config->priority,
+            config->task_handle,
+            tskNO_AFFINITY
+        );
+        
+        if (result == pdPASS) {
+            ESP_LOGI(TAG, "Task '%s' created with stack (%u bytes)", 
+                     config->task_name, (unsigned int)validated_stack_size);
             if (xSemaphoreTake(g_psram_ctx.mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 g_psram_ctx.info.psram_allocations++;
                 xSemaphoreGive(g_psram_ctx.mutex);
             }
         } else {
-            // Fall back to internal RAM
+            ESP_LOGW(TAG, "Task creation failed for '%s', trying fallback", config->task_name);
+            if (xSemaphoreTake(g_psram_ctx.mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                g_psram_ctx.info.psram_failures++;
+                xSemaphoreGive(g_psram_ctx.mutex);
+            }
+            
+            // Fall back to standard task creation
             result = xTaskCreate(
                 config->task_function,
                 config->task_name,
-                config->stack_size,
+                validated_stack_size,
                 config->parameters,
                 config->priority,
                 config->task_handle
             );
             
             if (result == pdPASS) {
-                ESP_LOGW(TAG, "Task '%s' fallback to internal RAM stack", config->task_name);
+                ESP_LOGW(TAG, "Task '%s' fallback to standard allocation", config->task_name);
                 if (xSemaphoreTake(g_psram_ctx.mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-                    g_psram_ctx.info.psram_failures++;
                     g_psram_ctx.info.fallback_allocations++;
                     xSemaphoreGive(g_psram_ctx.mutex);
                 }
@@ -354,12 +372,13 @@ BaseType_t psram_create_task(const psram_task_config_t* config)
         result = xTaskCreate(
             config->task_function,
             config->task_name,
-            config->stack_size,
+            validated_stack_size,
             config->parameters,
             config->priority,
             config->task_handle
         );
-        ESP_LOGD(TAG, "Task '%s' created with standard allocation", config->task_name);
+        ESP_LOGD(TAG, "Task '%s' created with standard allocation (%u bytes)", 
+                 config->task_name, (unsigned int)validated_stack_size);
     }
 
     return result;

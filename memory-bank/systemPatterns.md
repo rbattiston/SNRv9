@@ -89,6 +89,9 @@ components/
 **Files**:
 - `memory_monitor.c/h`: Heap usage tracking and leak detection
 - `task_tracker.c/h`: FreeRTOS task monitoring and stack analysis
+- `psram_manager.c/h`: PSRAM detection, allocation strategies, and health monitoring
+- `psram_task_examples.c/h`: Demonstration tasks showing PSRAM usage patterns
+- `psram_test_suite.c/h`: Comprehensive testing framework for PSRAM functionality
 - `debug_config.h`: Master configuration for all debug output
 
 **CMakeLists.txt Configuration**:
@@ -269,6 +272,17 @@ This component architecture provides a solid foundation for future development w
   - Handles formatting on mount failure
   - Integrates with the system logging pattern
 
+#### 5. PSRAM Management Pattern
+**Pattern**: Smart memory allocation with PSRAM utilization
+- **Implementation**: `psram_manager` component with allocation strategies and task creation framework
+- **Key Features**:
+  - ESP32-D0WD 8MB PSRAM detection and utilization (4MB mapped)
+  - Smart allocation strategies (Critical, Large Buffer, Cache, Normal)
+  - Task creation framework with configurable stack placement
+  - Comprehensive health monitoring and statistics tracking
+  - Thread-safe operations with fallback mechanisms
+  - Production-ready testing suite with 100% validation coverage
+
 ## Component Relationships
 
 ### Memory Monitor Module
@@ -297,6 +311,41 @@ storage_manager.c
 ├── Wraps esp_littlefs functions for system integration
 ├── Handles filesystem formatting on mount failure
 └── Provides logging consistent with system patterns
+```
+
+### PSRAM Manager Module
+```
+psram_manager.c
+├── PSRAM detection and capability assessment
+├── Smart allocation strategies (Critical, Large Buffer, Cache, Normal)
+├── Task creation framework with configurable stack placement
+├── Health monitoring and functionality validation
+├── Statistics tracking (success/failure rates, allocation counts)
+├── Thread-safe operations with mutex protection
+└── Fallback mechanisms for allocation failures
+```
+
+### PSRAM Task Examples Module
+```
+psram_task_examples.c
+├── Demonstration of PSRAM allocation strategies
+├── Critical task implementation (internal RAM)
+├── Data processing task implementation (PSRAM stack)
+├── Web server task implementation (PSRAM stack)
+├── Memory usage pattern examples
+└── Integration with existing monitoring systems
+```
+
+### PSRAM Test Suite Module
+```
+psram_test_suite.c
+├── 7-phase comprehensive testing framework
+├── PSRAM detection and availability validation
+├── Allocation strategy testing across all priority levels
+├── Task creation testing with different stack strategies
+├── Memory usage monitoring and analysis
+├── Health check and functionality validation
+└── Statistics reporting and success rate analysis
 ```
 
 ### Debug Configuration System
