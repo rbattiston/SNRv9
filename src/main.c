@@ -13,6 +13,7 @@
 #include "esp_chip_info.h"
 #include "memory_monitor.h"
 #include "task_tracker.h"
+#include "psram_manager.h"
 #include "wifi_handler.h"
 #include "web_server_manager.h"
 #include "auth_manager.h"
@@ -63,6 +64,13 @@ void app_main(void)
     // Initialize task tracking system
     if (!task_tracker_init()) {
         ESP_LOGE(TAG, "Failed to initialize task tracker");
+        return;
+    }
+    
+    // Initialize PSRAM management system
+    ESP_LOGI(TAG, "Initializing PSRAM manager...");
+    if (!psram_manager_init()) {
+        ESP_LOGE(TAG, "Failed to initialize PSRAM manager");
         return;
     }
     
@@ -164,6 +172,8 @@ void app_main(void)
         if (loop_counter % 600 == 0) {
             ESP_LOGI(TAG, "=== SYSTEM HEALTH CHECK ===");
             memory_monitor_print_detailed_report();
+            psram_manager_print_detailed_report();
+            psram_manager_print_allocation_stats();
             task_tracker_print_detailed_report();
             task_tracker_print_stack_analysis();
             wifi_handler_print_detailed_report();
@@ -175,6 +185,11 @@ void app_main(void)
             // Check for potential memory leaks
             if (memory_monitor_check_for_leaks()) {
                 ESP_LOGW(TAG, "Potential memory leak detected!");
+            }
+            
+            // Check PSRAM health
+            if (!psram_manager_health_check()) {
+                ESP_LOGW(TAG, "PSRAM health check failed!");
             }
         }
         

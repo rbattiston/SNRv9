@@ -159,6 +159,40 @@ extern "C" {
  */
 #define DEBUG_DATA_LOGGING 0
 
+/* =============================================================================
+ * PSRAM MANAGEMENT DEBUG CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief Enable/disable PSRAM management system
+ * Set to 1 to enable PSRAM detection and management, 0 to disable
+ */
+#define DEBUG_PSRAM_MANAGER 1
+
+/**
+ * @brief Enable/disable detailed PSRAM output
+ * Set to 1 for detailed PSRAM allocation tracking, 0 for summary only
+ */
+#define DEBUG_PSRAM_DETAILED 1
+
+/**
+ * @brief PSRAM monitoring report interval in milliseconds
+ * How often to output PSRAM statistics to serial
+ */
+#define DEBUG_PSRAM_REPORT_INTERVAL_MS 30000
+
+/**
+ * @brief Debug output tag for PSRAM manager
+ */
+#define DEBUG_PSRAM_TAG "PSRAM_MGR"
+
+/**
+ * @brief Enable/disable PSRAM allocation statistics tracking
+ * Set to 1 to track allocation success/failure rates
+ */
+#define DEBUG_PSRAM_ALLOCATION_STATS 1
+
 #ifdef __cplusplus
 }
 #endif
