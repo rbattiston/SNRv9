@@ -130,3 +130,61 @@ void storage_manager_list_filesystem(void)
     
     ESP_LOGI(TAG, "=== End Directory Listing ===");
 }
+
+esp_err_t storage_manager_read_file(const char* file_path, char** content, size_t* size)
+{
+    if (!file_path || !content || !size) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Build full path
+    char full_path[512];
+    snprintf(full_path, sizeof(full_path), "/littlefs/%s", file_path);
+
+    // Open file for reading
+    FILE* file = fopen(full_path, "r");
+    if (!file) {
+        ESP_LOGE(TAG, "Failed to open file for reading: %s", full_path);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    if (file_size < 0) {
+        ESP_LOGE(TAG, "Failed to get file size: %s", full_path);
+        fclose(file);
+        return ESP_FAIL;
+    }
+
+    // Allocate buffer for file contents
+    char* buffer = malloc(file_size + 1);
+    if (!buffer) {
+        ESP_LOGE(TAG, "Failed to allocate memory for file contents");
+        fclose(file);
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Read file contents
+    size_t bytes_read = fread(buffer, 1, file_size, file);
+    fclose(file);
+
+    if (bytes_read != (size_t)file_size) {
+        ESP_LOGE(TAG, "Failed to read complete file: %s (read %zu of %ld bytes)", 
+                 full_path, bytes_read, file_size);
+        free(buffer);
+        return ESP_FAIL;
+    }
+
+    // Null-terminate the buffer
+    buffer[file_size] = '\0';
+
+    // Return results
+    *content = buffer;
+    *size = (size_t)file_size;
+
+    ESP_LOGI(TAG, "Successfully read file: %s (%zu bytes)", file_path, (size_t)file_size);
+    return ESP_OK;
+}

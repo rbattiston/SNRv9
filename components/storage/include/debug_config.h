@@ -118,6 +118,11 @@ extern "C" {
  */
 #define DEBUG_SYSTEM_CONTROLLER_TAG "SYSTEM_CTRL"
 
+/**
+ * @brief Debug output tag for config manager
+ */
+#define DEBUG_CONFIG_MANAGER_TAG "CONFIG_MGR"
+
 /* =============================================================================
  * FUTURE EXPANSION DEBUG FLAGS
  * =============================================================================

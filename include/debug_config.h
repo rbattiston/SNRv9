@@ -159,6 +159,150 @@ extern "C" {
  */
 #define DEBUG_DATA_LOGGING 0
 
+/* =============================================================================
+ * IO SYSTEM DEBUG CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief Enable/disable IO Manager debug output
+ * Set to 1 to enable IO manager debugging, 0 to disable
+ */
+#define DEBUG_IO_MANAGER 1
+
+/**
+ * @brief Enable/disable Configuration Manager debug output
+ * Set to 1 to enable config manager debugging, 0 to disable
+ */
+#define DEBUG_CONFIG_MANAGER 1
+
+/**
+ * @brief Enable/disable GPIO Handler debug output
+ * Set to 1 to enable GPIO handler debugging, 0 to disable
+ */
+#define DEBUG_GPIO_HANDLER 1
+
+/**
+ * @brief Enable/disable Shift Register Handler debug output
+ * Set to 1 to enable shift register debugging, 0 to disable
+ */
+#define DEBUG_SHIFT_REGISTER 1
+
+/**
+ * @brief Enable/disable verbose shift register operations
+ * Set to 1 for detailed bit-level operations, 0 for summary only
+ */
+#define DEBUG_SHIFT_REGISTER_VERBOSE 0
+
+/**
+ * @brief Enable/disable Signal Conditioner debug output
+ * Set to 1 to enable signal processing debugging, 0 to disable
+ */
+#define DEBUG_SIGNAL_CONDITIONER 1
+
+/**
+ * @brief Enable/disable verbose signal processing
+ * Set to 1 for detailed processing steps, 0 for summary only
+ */
+#define DEBUG_SIGNAL_CONDITIONER_VERBOSE 0
+
+/**
+ * @brief Enable/disable IO State Manager debug output
+ * Set to 1 to enable state manager debugging, 0 to disable
+ */
+#define DEBUG_IO_STATE_MANAGER 1
+
+/**
+ * @brief Enable/disable Alarm System debug output
+ * Set to 1 to enable alarm system debugging, 0 to disable
+ */
+#define DEBUG_ALARM_SYSTEM 1
+
+/**
+ * @brief Enable/disable IO Web Controllers debug output
+ * Set to 1 to enable IO controller debugging, 0 to disable
+ */
+#define DEBUG_IO_CONTROLLERS 1
+
+/**
+ * @brief Enable/disable IO Test Manager debug output
+ * Set to 1 to enable IO test manager debugging, 0 to disable
+ */
+#define DEBUG_IO_TEST_MANAGER 1
+
+/* =============================================================================
+ * IO SYSTEM TIMING CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief IO polling interval in milliseconds
+ * How often to read all inputs and update states
+ */
+#define DEBUG_IO_POLLING_INTERVAL_MS 1000
+
+/**
+ * @brief IO status report interval in milliseconds
+ * How often to output IO system status to serial
+ */
+#define DEBUG_IO_REPORT_INTERVAL_MS 10000
+
+/**
+ * @brief Alarm check interval in milliseconds
+ * How often to check for alarm conditions
+ */
+#define DEBUG_ALARM_CHECK_INTERVAL_MS 5000
+
+/* =============================================================================
+ * IO SYSTEM OUTPUT TAGS
+ * =============================================================================
+ */
+
+/**
+ * @brief Debug output tag for IO Manager
+ */
+#define DEBUG_IO_MANAGER_TAG "IO_MANAGER"
+
+/**
+ * @brief Debug output tag for Configuration Manager
+ */
+#define DEBUG_CONFIG_MANAGER_TAG "CONFIG_MGR"
+
+/**
+ * @brief Debug output tag for GPIO Handler
+ */
+#define DEBUG_GPIO_HANDLER_TAG "GPIO_HANDLER"
+
+/**
+ * @brief Debug output tag for Shift Register Handler
+ */
+#define DEBUG_SHIFT_REGISTER_TAG "SHIFT_REG"
+
+/**
+ * @brief Debug output tag for Signal Conditioner
+ */
+#define DEBUG_SIGNAL_CONDITIONER_TAG "SIGNAL_COND"
+
+/**
+ * @brief Debug output tag for IO State Manager
+ */
+#define DEBUG_IO_STATE_MANAGER_TAG "IO_STATE"
+
+/**
+ * @brief Debug output tag for Alarm System
+ */
+#define DEBUG_ALARM_SYSTEM_TAG "ALARM_SYS"
+
+/**
+ * @brief Debug output tag for IO Controllers
+ */
+#define DEBUG_IO_CONTROLLERS_TAG "IO_CTRL"
+
+/**
+ * @brief Debug output tag for IO Test Manager
+ */
+#define DEBUG_IO_TEST_MANAGER_TAG "IO_TEST"
+
 #ifdef __cplusplus
 }
 #endif

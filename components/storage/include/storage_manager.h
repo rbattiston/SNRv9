@@ -23,4 +23,17 @@ esp_err_t storage_manager_init(void);
  */
 void storage_manager_list_filesystem(void);
 
+/**
+ * @brief Reads a file from the LittleFS filesystem.
+ *
+ * This function reads the entire contents of a file into a dynamically
+ * allocated buffer. The caller is responsible for freeing the buffer.
+ *
+ * @param file_path Path to the file to read (relative to /littlefs)
+ * @param content Pointer to store the allocated buffer containing file contents
+ * @param size Pointer to store the size of the file in bytes
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t storage_manager_read_file(const char* file_path, char** content, size_t* size);
+
 #endif // STORAGE_MANAGER_H

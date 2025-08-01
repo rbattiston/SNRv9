@@ -21,9 +21,15 @@
 #include "auth_manager.h"
 #include "auth_controller.h"
 #include "storage_manager.h"
+#include "config_manager.h"
+#include "io_manager.h"
 #include "debug_config.h"
 
 static const char *TAG = "SNRv9_MAIN";
+
+// Global IO system instances
+static config_manager_t config_manager;
+static io_manager_t io_manager;
 
 /**
  * @brief Task creation callback for system monitoring
@@ -236,6 +242,27 @@ void app_main(void)
             ESP_LOGI(TAG, "Incremented boot count to: %d", count);
             fclose(f);
         }
+    }
+    
+    // Initialize configuration manager
+    ESP_LOGI(TAG, "Initializing configuration manager...");
+    if (config_manager_init(&config_manager, "/littlefs/io_config.json") != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize configuration manager");
+        return;
+    }
+    
+    // Initialize IO manager
+    ESP_LOGI(TAG, "Initializing IO manager...");
+    if (io_manager_init(&io_manager, &config_manager) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize IO manager");
+        return;
+    }
+    
+    // Start IO polling
+    ESP_LOGI(TAG, "Starting IO polling task...");
+    if (io_manager_start_polling(&io_manager, 1000, 2, 4096) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start IO polling task");
+        return;
     }
     
     // Register task lifecycle callbacks
