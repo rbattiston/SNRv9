@@ -24,9 +24,9 @@ extern "C" {
  */
 
 #define WEB_SERVER_DEFAULT_PORT         80
-#define WEB_SERVER_MAX_URI_HANDLERS     20
+#define WEB_SERVER_MAX_URI_HANDLERS     100
 #define WEB_SERVER_MAX_OPEN_SOCKETS     7
-#define WEB_SERVER_TASK_STACK_SIZE      4096
+#define WEB_SERVER_TASK_STACK_SIZE      16384
 #define WEB_SERVER_TASK_PRIORITY        1
 #define WEB_SERVER_TASK_NAME            "web_server"
 
