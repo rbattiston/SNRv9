@@ -40,7 +40,7 @@ typedef struct {
     uint32_t error_count;               ///< Number of errors
     
     // Signal conditioning state
-    float sma_buffer[16];               ///< SMA filter buffer
+    float sma_buffer[32];               ///< SMA filter buffer (increased to match config max)
     int sma_index;                      ///< Current SMA buffer index
     int sma_count;                      ///< Number of samples in SMA buffer
     float sma_sum;                      ///< Running sum for SMA calculation

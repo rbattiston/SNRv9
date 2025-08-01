@@ -5,6 +5,7 @@
 
 #include "io_manager.h"
 #include "debug_config.h"
+#include "psram_manager.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/task.h"
@@ -92,8 +93,16 @@ static esp_err_t configure_io_points(io_manager_t* manager) {
     ESP_LOGI(TAG, "Starting IO point configuration...");
     manager->active_point_count = 0;
     
-    // Get all IO points from configuration
-    io_point_config_t configs[CONFIG_MAX_IO_POINTS];
+    // Allocate configuration array in PSRAM to avoid stack overflow
+    size_t config_array_size = CONFIG_MAX_IO_POINTS * sizeof(io_point_config_t);
+    ESP_LOGI(TAG, "Allocating %zu bytes in PSRAM for IO configuration array", config_array_size);
+    
+    io_point_config_t* configs = psram_smart_malloc(config_array_size, ALLOC_LARGE_BUFFER);
+    if (!configs) {
+        ESP_LOGE(TAG, "Failed to allocate %zu bytes in PSRAM for IO config", config_array_size);
+        return ESP_ERR_NO_MEM;
+    }
+    
     int config_count = 0;
     
     ESP_LOGI(TAG, "Requesting IO points from configuration manager...");
@@ -102,6 +111,7 @@ static esp_err_t configure_io_points(io_manager_t* manager) {
                                                     &config_count);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get IO points from config manager: %s", esp_err_to_name(ret));
+        psram_smart_free(configs);
         return ret;
     }
     
@@ -177,6 +187,11 @@ static esp_err_t configure_io_points(io_manager_t* manager) {
     }
     
     ESP_LOGI(TAG, "IO point configuration complete: %d points configured", manager->active_point_count);
+    
+    // Free PSRAM allocation
+    psram_smart_free(configs);
+    ESP_LOGI(TAG, "PSRAM configuration array freed");
+    
     return ESP_OK;
 }
 

@@ -1,48 +1,17 @@
 /**
  * @file gpio_handler.c
  * @brief GPIO Handler implementation for SNRv9 Irrigation Control System
- * 
- * Provides hardware abstraction for ESP32 GPIO operations including
- * digital input/output and analog input (ADC) functionality.
- * Updated for ESP-IDF v5.4.1 ADC oneshot driver.
  */
 
 #include "gpio_handler.h"
 #include "debug_config.h"
 #include "esp_log.h"
+#include "driver/gpio.h"
+#include "driver/adc.h"
+#include "esp_adc_cal.h"
 #include <string.h>
 
 static const char* TAG = DEBUG_GPIO_HANDLER_TAG;
-
-/**
- * @brief Pin to ADC channel mapping for ESP32
- * 
- * @param pin GPIO pin number
- * @return adc_channel_t ADC channel or -1 if invalid
- */
-static adc_channel_t pin_to_adc_channel(int pin) {
-    switch (pin) {
-        case 36: return ADC_CHANNEL_0;
-        case 37: return ADC_CHANNEL_1;
-        case 38: return ADC_CHANNEL_2;
-        case 39: return ADC_CHANNEL_3;
-        case 32: return ADC_CHANNEL_4;
-        case 33: return ADC_CHANNEL_5;
-        case 34: return ADC_CHANNEL_6;
-        case 35: return ADC_CHANNEL_7;
-        default: return -1;
-    }
-}
-
-/**
- * @brief Validate GPIO pin number
- * 
- * @param pin GPIO pin number
- * @return true if valid, false otherwise
- */
-static bool is_valid_gpio_pin(int pin) {
-    return (pin >= 0 && pin < GPIO_NUM_MAX);
-}
 
 esp_err_t gpio_handler_init(gpio_handler_t* handler) {
     if (!handler) {
@@ -52,39 +21,24 @@ esp_err_t gpio_handler_init(gpio_handler_t* handler) {
     // Initialize structure
     memset(handler, 0, sizeof(gpio_handler_t));
     
-    // Initialize ADC oneshot unit
-    adc_oneshot_unit_init_cfg_t init_config = {
-        .unit_id = ADC_UNIT_1,
-        .ulp_mode = ADC_ULP_MODE_DISABLE,
-    };
-    
-    esp_err_t ret = adc_oneshot_new_unit(&init_config, &handler->adc_handle);
+    // Initialize ADC1 for analog inputs
+    esp_err_t ret = adc1_config_width(ADC_WIDTH_BIT_12);
     if (ret != ESP_OK) {
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Failed to initialize ADC unit: %s", esp_err_to_name(ret));
-#endif
+        ESP_LOGE(TAG, "Failed to configure ADC width: %s", esp_err_to_name(ret));
         return ret;
     }
     
     handler->initialized = true;
     
 #ifdef DEBUG_GPIO_HANDLER
-    ESP_LOGI(TAG, "GPIO handler initialized successfully with new ADC driver");
+    ESP_LOGI(TAG, "GPIO handler initialized");
 #endif
     
     return ESP_OK;
 }
 
 esp_err_t gpio_handler_configure_input(gpio_handler_t* handler, int pin, bool pullup) {
-    if (!handler || !handler->initialized) {
-        return ESP_ERR_INVALID_STATE;
-    }
-    
-    if (!is_valid_gpio_pin(pin)) {
-        handler->error_count++;
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Invalid GPIO pin number: %d", pin);
-#endif
+    if (!handler || !handler->initialized || pin < 0) {
         return ESP_ERR_INVALID_ARG;
     }
     
@@ -97,33 +51,20 @@ esp_err_t gpio_handler_configure_input(gpio_handler_t* handler, int pin, bool pu
     };
     
     esp_err_t ret = gpio_config(&io_conf);
-    if (ret == ESP_OK) {
-        handler->configured_pins |= (1ULL << pin);
-        handler->input_pins |= (1ULL << pin);
-        
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGI(TAG, "Configured pin %d as input (pullup: %s)", pin, pullup ? "enabled" : "disabled");
-#endif
-    } else {
-        handler->error_count++;
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Failed to configure pin %d as input: %s", pin, esp_err_to_name(ret));
-#endif
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure GPIO %d as input: %s", pin, esp_err_to_name(ret));
+        return ret;
     }
     
-    return ret;
+#ifdef DEBUG_GPIO_HANDLER
+    ESP_LOGI(TAG, "Configured GPIO %d as input (pullup: %s)", pin, pullup ? "enabled" : "disabled");
+#endif
+    
+    return ESP_OK;
 }
 
 esp_err_t gpio_handler_configure_output(gpio_handler_t* handler, int pin, bool initial_state) {
-    if (!handler || !handler->initialized) {
-        return ESP_ERR_INVALID_STATE;
-    }
-    
-    if (!is_valid_gpio_pin(pin)) {
-        handler->error_count++;
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Invalid GPIO pin number: %d", pin);
-#endif
+    if (!handler || !handler->initialized || pin < 0) {
         return ESP_ERR_INVALID_ARG;
     }
     
@@ -136,207 +77,117 @@ esp_err_t gpio_handler_configure_output(gpio_handler_t* handler, int pin, bool i
     };
     
     esp_err_t ret = gpio_config(&io_conf);
-    if (ret == ESP_OK) {
-        // Set initial state
-        gpio_set_level(pin, initial_state ? 1 : 0);
-        
-        handler->configured_pins |= (1ULL << pin);
-        handler->output_pins |= (1ULL << pin);
-        
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGI(TAG, "Configured pin %d as output (initial: %s)", pin, initial_state ? "HIGH" : "LOW");
-#endif
-    } else {
-        handler->error_count++;
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Failed to configure pin %d as output: %s", pin, esp_err_to_name(ret));
-#endif
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure GPIO %d as output: %s", pin, esp_err_to_name(ret));
+        return ret;
     }
     
-    return ret;
+    // Set initial state
+    ret = gpio_set_level(pin, initial_state ? 1 : 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set initial state for GPIO %d: %s", pin, esp_err_to_name(ret));
+        return ret;
+    }
+    
+#ifdef DEBUG_GPIO_HANDLER
+    ESP_LOGI(TAG, "Configured GPIO %d as output (initial: %s)", pin, initial_state ? "HIGH" : "LOW");
+#endif
+    
+    return ESP_OK;
 }
 
 esp_err_t gpio_handler_configure_analog(gpio_handler_t* handler, int pin) {
-    if (!handler || !handler->initialized) {
-        return ESP_ERR_INVALID_STATE;
-    }
-    
-    if (!is_valid_gpio_pin(pin)) {
-        handler->error_count++;
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Invalid GPIO pin number: %d", pin);
-#endif
+    if (!handler || !handler->initialized || pin < 0) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    adc_channel_t channel = pin_to_adc_channel(pin);
-    if (channel < 0) {
-        handler->error_count++;
+    // Convert GPIO pin to ADC channel
+    adc1_channel_t channel;
+    switch (pin) {
+        case 32: channel = ADC1_CHANNEL_4; break;
+        case 33: channel = ADC1_CHANNEL_5; break;
+        case 34: channel = ADC1_CHANNEL_6; break;
+        case 35: channel = ADC1_CHANNEL_7; break;
+        case 36: channel = ADC1_CHANNEL_0; break;
+        case 39: channel = ADC1_CHANNEL_3; break;
+        default:
+            ESP_LOGE(TAG, "GPIO %d is not a valid ADC pin", pin);
+            return ESP_ERR_INVALID_ARG;
+    }
+    
+    esp_err_t ret = adc1_config_channel_atten(channel, ADC_ATTEN_DB_11);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure ADC channel for GPIO %d: %s", pin, esp_err_to_name(ret));
+        return ret;
+    }
+    
 #ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Pin %d is not a valid ADC pin", pin);
+    ESP_LOGI(TAG, "Configured GPIO %d as analog input (ADC channel %d)", pin, channel);
 #endif
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    // Configure ADC channel with 12dB attenuation (0-3.3V range)
-    adc_oneshot_chan_cfg_t config = {
-        .bitwidth = ADC_BITWIDTH_12,
-        .atten = ADC_ATTEN_DB_12,
-    };
-    
-    esp_err_t ret = adc_oneshot_config_channel(handler->adc_handle, channel, &config);
-    if (ret == ESP_OK) {
-        handler->configured_pins |= (1ULL << pin);
-        handler->analog_pins |= (1ULL << pin);
-        
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGI(TAG, "Configured pin %d as analog input (ADC channel %d)", pin, channel);
-#endif
-    } else {
-        handler->error_count++;
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Failed to configure pin %d as analog: %s", pin, esp_err_to_name(ret));
-#endif
-    }
-    
-    return ret;
-}
-
-esp_err_t gpio_handler_read_digital(gpio_handler_t* handler, int pin, bool* value) {
-    if (!handler || !handler->initialized || !value) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    if (!is_valid_gpio_pin(pin)) {
-        handler->error_count++;
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    if (!(handler->input_pins & (1ULL << pin))) {
-        handler->error_count++;
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Pin %d is not configured as input", pin);
-#endif
-        return ESP_ERR_INVALID_STATE;
-    }
-    
-    *value = gpio_get_level(pin) ? true : false;
-    handler->read_count++;
     
     return ESP_OK;
 }
 
-esp_err_t gpio_handler_write_digital(gpio_handler_t* handler, int pin, bool value) {
-    if (!handler || !handler->initialized) {
+esp_err_t gpio_handler_read_digital(gpio_handler_t* handler, int pin, bool* state) {
+    if (!handler || !handler->initialized || pin < 0 || !state) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    if (!is_valid_gpio_pin(pin)) {
-        handler->error_count++;
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    if (!(handler->output_pins & (1ULL << pin))) {
-        handler->error_count++;
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Pin %d is not configured as output", pin);
-#endif
-        return ESP_ERR_INVALID_STATE;
-    }
-    
-    gpio_set_level(pin, value ? 1 : 0);
-    handler->write_count++;
+    int level = gpio_get_level(pin);
+    *state = (level != 0);
     
     return ESP_OK;
 }
 
-esp_err_t gpio_handler_read_analog(gpio_handler_t* handler, int pin, int* value) {
-    if (!handler || !handler->initialized || !value) {
+esp_err_t gpio_handler_write_digital(gpio_handler_t* handler, int pin, bool state) {
+    if (!handler || !handler->initialized || pin < 0) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    if (!is_valid_gpio_pin(pin)) {
-        handler->error_count++;
-        return ESP_ERR_INVALID_ARG;
+    esp_err_t ret = gpio_set_level(pin, state ? 1 : 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set GPIO %d to %s: %s", pin, state ? "HIGH" : "LOW", esp_err_to_name(ret));
+        return ret;
     }
-    
-    if (!(handler->analog_pins & (1ULL << pin))) {
-        handler->error_count++;
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Pin %d is not configured as analog input", pin);
-#endif
-        return ESP_ERR_INVALID_STATE;
-    }
-    
-    adc_channel_t channel = pin_to_adc_channel(pin);
-    if (channel < 0) {
-        handler->error_count++;
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    esp_err_t ret = adc_oneshot_read(handler->adc_handle, channel, value);
-    if (ret == ESP_OK) {
-        handler->read_count++;
-    } else {
-        handler->error_count++;
-#ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGE(TAG, "Failed to read ADC channel %d: %s", channel, esp_err_to_name(ret));
-#endif
-    }
-    
-    return ret;
-}
-
-esp_err_t gpio_handler_get_pin_info(gpio_handler_t* handler, int pin, bool* is_input, bool* is_output, bool* is_analog) {
-    if (!handler || !handler->initialized) {
-        return ESP_ERR_INVALID_STATE;
-    }
-    
-    if (!is_valid_gpio_pin(pin)) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    if (is_input) *is_input = (handler->input_pins & (1ULL << pin)) != 0;
-    if (is_output) *is_output = (handler->output_pins & (1ULL << pin)) != 0;
-    if (is_analog) *is_analog = (handler->analog_pins & (1ULL << pin)) != 0;
     
     return ESP_OK;
 }
 
-esp_err_t gpio_handler_get_statistics(gpio_handler_t* handler, uint32_t* reads, uint32_t* writes, uint32_t* errors) {
-    if (!handler || !handler->initialized) {
-        return ESP_ERR_INVALID_STATE;
+esp_err_t gpio_handler_read_analog(gpio_handler_t* handler, int pin, int* raw_value) {
+    if (!handler || !handler->initialized || pin < 0 || !raw_value) {
+        return ESP_ERR_INVALID_ARG;
     }
     
-    if (reads) *reads = handler->read_count;
-    if (writes) *writes = handler->write_count;
-    if (errors) *errors = handler->error_count;
+    // Convert GPIO pin to ADC channel
+    adc1_channel_t channel;
+    switch (pin) {
+        case 32: channel = ADC1_CHANNEL_4; break;
+        case 33: channel = ADC1_CHANNEL_5; break;
+        case 34: channel = ADC1_CHANNEL_6; break;
+        case 35: channel = ADC1_CHANNEL_7; break;
+        case 36: channel = ADC1_CHANNEL_0; break;
+        case 39: channel = ADC1_CHANNEL_3; break;
+        default:
+            ESP_LOGE(TAG, "GPIO %d is not a valid ADC pin", pin);
+            return ESP_ERR_INVALID_ARG;
+    }
     
+    int adc_reading = adc1_get_raw(channel);
+    if (adc_reading < 0) {
+        ESP_LOGE(TAG, "Failed to read ADC from GPIO %d", pin);
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    
+    *raw_value = adc_reading;
     return ESP_OK;
 }
 
 void gpio_handler_destroy(gpio_handler_t* handler) {
     if (handler && handler->initialized) {
-        // Clean up ADC unit
-        if (handler->adc_handle) {
-            esp_err_t ret = adc_oneshot_del_unit(handler->adc_handle);
-            if (ret != ESP_OK) {
-#ifdef DEBUG_GPIO_HANDLER
-                ESP_LOGE(TAG, "Failed to delete ADC unit: %s", esp_err_to_name(ret));
-#endif
-            }
-            handler->adc_handle = NULL;
-        }
-        
         handler->initialized = false;
-        handler->configured_pins = 0;
-        handler->input_pins = 0;
-        handler->output_pins = 0;
-        handler->analog_pins = 0;
         
 #ifdef DEBUG_GPIO_HANDLER
-        ESP_LOGI(TAG, "GPIO handler destroyed (reads: %lu, writes: %lu, errors: %lu)", 
-                 handler->read_count, handler->write_count, handler->error_count);
+        ESP_LOGI(TAG, "GPIO handler destroyed");
 #endif
     }
 }
