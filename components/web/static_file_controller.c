@@ -195,6 +195,20 @@ bool static_file_controller_register_handlers(httpd_handle_t server)
         return false;
     }
 
+    // Register io_test.html handler
+    httpd_uri_t io_test_uri = {
+        .uri = "/io_test.html",
+        .method = HTTP_GET,
+        .handler = file_handler,
+        .user_ctx = NULL
+    };
+
+    ret = httpd_register_uri_handler(server, &io_test_uri);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register io_test.html handler: %s", esp_err_to_name(ret));
+        return false;
+    }
+
     httpd_uri_t app_js_uri = {
         .uri = "/app.js",
         .method = HTTP_GET,
