@@ -13,7 +13,7 @@
 #include <stdbool.h>
 #include "esp_err.h"
 #include "driver/gpio.h"
-#include "driver/adc.h"
+#include "esp_adc/adc_oneshot.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +38,7 @@ typedef struct {
     uint32_t read_count;                ///< Number of read operations
     uint32_t write_count;               ///< Number of write operations
     uint32_t error_count;               ///< Number of errors encountered
+    adc_oneshot_unit_handle_t adc_handle; ///< ADC unit handle for analog operations
 } gpio_handler_t;
 
 /**

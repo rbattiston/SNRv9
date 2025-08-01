@@ -50,8 +50,9 @@ esp_err_t alarm_manager_init(alarm_manager_t* manager, config_manager_t* config_
     manager->config_manager = config_manager;
 
     // Load IO configuration and initialize alarm states
-    io_config_t io_config;
-    esp_err_t ret = config_manager_get_io_config(config_manager, &io_config);
+    io_point_config_t io_points[CONFIG_MAX_IO_POINTS];
+    int actual_count = 0;
+    esp_err_t ret = config_manager_get_all_io_points(config_manager, io_points, CONFIG_MAX_IO_POINTS, &actual_count);
     if (ret != ESP_OK) {
 #ifdef DEBUG_ALARM_SYSTEM
         printf("[%s] Failed to load IO configuration: %s\n", TAG, esp_err_to_name(ret));
@@ -62,8 +63,8 @@ esp_err_t alarm_manager_init(alarm_manager_t* manager, config_manager_t* config_
 
     // Initialize alarm states for points with alarm configuration
     manager->active_point_count = 0;
-    for (int i = 0; i < io_config.point_count && manager->active_point_count < CONFIG_MAX_IO_POINTS; i++) {
-        const io_point_config_t* point = &io_config.points[i];
+    for (int i = 0; i < actual_count && manager->active_point_count < CONFIG_MAX_IO_POINTS; i++) {
+        const io_point_config_t* point = &io_points[i];
         
         // Only monitor analog inputs with alarm configuration enabled
         if (point->type == IO_POINT_TYPE_GPIO_AI && point->alarm_config.enabled) {
@@ -124,8 +125,8 @@ esp_err_t alarm_manager_start_monitoring(alarm_manager_t* manager, uint32_t chec
     manager->alarm_task_running = true;
 
 #ifdef DEBUG_ALARM_SYSTEM
-    printf("[%s] Alarm monitoring task started (interval: %lu ms, priority: %lu, stack: %lu)\n", 
-           TAG, check_interval_ms, task_priority, task_stack_size);
+    printf("[%s] Alarm monitoring task started (interval: %lu ms, priority: %u, stack: %lu)\n", 
+           TAG, check_interval_ms, (unsigned int)task_priority, task_stack_size);
 #endif
 
     return ESP_OK;
@@ -205,7 +206,7 @@ esp_err_t alarm_manager_check_point(alarm_manager_t* manager, const char* point_
 
     // Get alarm configuration
     io_point_config_t point_config;
-    esp_err_t ret = config_manager_get_point_config(manager->config_manager, point_id, &point_config);
+    esp_err_t ret = config_manager_get_io_point_config(manager->config_manager, point_id, &point_config);
     if (ret != ESP_OK) {
         return ret;
     }

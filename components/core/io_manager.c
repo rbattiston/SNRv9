@@ -7,20 +7,11 @@
 #include "debug_config.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "esp_adc/adc_oneshot.h"
-#include "esp_adc/adc_cali.h"
-#include "esp_adc/adc_cali_scheme.h"
 #include "freertos/task.h"
 #include <string.h>
 #include <math.h>
 
 static const char* TAG = DEBUG_IO_MANAGER_TAG;
-
-/**
- * @brief ADC calibration handle
- */
-static adc_cali_handle_t adc_cali_handle = NULL;
-static adc_oneshot_unit_handle_t adc_handle = NULL;
 
 /**
  * @brief Find IO point index by ID
@@ -93,58 +84,40 @@ static float apply_signal_conditioning(const io_point_config_t* config,
     return conditioned;
 }
 
-/**
- * @brief Initialize ADC for analog inputs
- */
-static esp_err_t init_adc(void) {
-    // Initialize ADC oneshot
-    adc_oneshot_unit_init_cfg_t init_config = {
-        .unit_id = ADC_UNIT_1,
-        .ulp_mode = ADC_ULP_MODE_DISABLE,
-    };
-    
-    esp_err_t ret = adc_oneshot_new_unit(&init_config, &adc_handle);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-    
-    // Initialize ADC calibration
-    adc_cali_line_fitting_config_t cali_config = {
-        .unit_id = ADC_UNIT_1,
-        .atten = ADC_ATTEN_DB_12,
-        .bitwidth = ADC_BITWIDTH_12,
-    };
-    
-    ret = adc_cali_create_scheme_line_fitting(&cali_config, &adc_cali_handle);
-    if (ret != ESP_OK) {
-#ifdef DEBUG_IO_MANAGER
-        ESP_LOGW(TAG, "ADC calibration not available, using raw values");
-#endif
-    }
-    
-    return ESP_OK;
-}
 
 /**
  * @brief Configure IO points from configuration
  */
 static esp_err_t configure_io_points(io_manager_t* manager) {
+    ESP_LOGI(TAG, "Starting IO point configuration...");
     manager->active_point_count = 0;
     
     // Get all IO points from configuration
     io_point_config_t configs[CONFIG_MAX_IO_POINTS];
     int config_count = 0;
     
+    ESP_LOGI(TAG, "Requesting IO points from configuration manager...");
     esp_err_t ret = config_manager_get_all_io_points(manager->config_manager, 
                                                     configs, CONFIG_MAX_IO_POINTS, 
                                                     &config_count);
     if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get IO points from config manager: %s", esp_err_to_name(ret));
         return ret;
+    }
+    
+    ESP_LOGI(TAG, "Configuration manager returned %d IO points", config_count);
+    
+    if (config_count == 0) {
+        ESP_LOGW(TAG, "No IO points found in configuration!");
+        return ESP_OK; // Not an error, just no points configured
     }
     
     // Configure each IO point
     for (int i = 0; i < config_count && i < IO_MANAGER_MAX_POINTS; i++) {
         const io_point_config_t* config = &configs[i];
+        
+        ESP_LOGI(TAG, "Configuring IO point [%d]: %s (type: %d, pin: %d)", 
+                 i, config->id, config->type, config->pin);
         
         // Store point ID mapping
         strncpy(manager->point_ids[i], config->id, CONFIG_MAX_ID_LENGTH - 1);
@@ -158,41 +131,52 @@ static esp_err_t configure_io_points(io_manager_t* manager) {
         switch (config->type) {
             case IO_POINT_TYPE_GPIO_AI:
                 if (config->pin >= 0) {
-                    adc_oneshot_chan_cfg_t adc_config = {
-                        .atten = ADC_ATTEN_DB_12,
-                        .bitwidth = ADC_BITWIDTH_12,
-                    };
-                    adc_oneshot_config_channel(adc_handle, config->pin, &adc_config);
+                    ESP_LOGI(TAG, "  Configuring GPIO analog input on pin %d", config->pin);
+                    gpio_handler_configure_analog(&manager->gpio_handler, config->pin);
+                } else {
+                    ESP_LOGW(TAG, "  Invalid pin %d for GPIO AI point %s", config->pin, config->id);
                 }
                 break;
                 
             case IO_POINT_TYPE_GPIO_BI:
                 if (config->pin >= 0) {
+                    ESP_LOGI(TAG, "  Configuring GPIO binary input on pin %d", config->pin);
                     gpio_handler_configure_input(&manager->gpio_handler, config->pin, true);
+                } else {
+                    ESP_LOGW(TAG, "  Invalid pin %d for GPIO BI point %s", config->pin, config->id);
                 }
                 break;
                 
             case IO_POINT_TYPE_GPIO_BO:
                 if (config->pin >= 0) {
                     bool initial_state = config->is_inverted ? 1 : 0;
+                    ESP_LOGI(TAG, "  Configuring GPIO binary output on pin %d (initial: %d)", 
+                             config->pin, initial_state);
                     gpio_handler_configure_output(&manager->gpio_handler, config->pin, initial_state);
+                } else {
+                    ESP_LOGW(TAG, "  Invalid pin %d for GPIO BO point %s", config->pin, config->id);
                 }
                 break;
                 
             case IO_POINT_TYPE_SHIFT_REG_BI:
+                ESP_LOGI(TAG, "  Configuring shift register binary input (chip: %d, bit: %d)", 
+                         config->chip_index, config->bit_index);
+                break;
+                
             case IO_POINT_TYPE_SHIFT_REG_BO:
-                // Shift register points are handled by the shift register handler
+                ESP_LOGI(TAG, "  Configuring shift register binary output (chip: %d, bit: %d)", 
+                         config->chip_index, config->bit_index);
+                break;
+                
+            default:
+                ESP_LOGW(TAG, "  Unknown IO point type: %d", config->type);
                 break;
         }
         
         manager->active_point_count++;
-        
-#ifdef DEBUG_IO_MANAGER
-        ESP_LOGI(TAG, "Configured IO point: %s (type: %d, pin: %d)", 
-                 config->id, config->type, config->pin);
-#endif
     }
     
+    ESP_LOGI(TAG, "IO point configuration complete: %d points configured", manager->active_point_count);
     return ESP_OK;
 }
 
@@ -210,23 +194,17 @@ static esp_err_t update_analog_input(io_manager_t* manager, int point_index) {
     
     io_point_runtime_state_t* state = &manager->runtime_states[point_index];
     
-    // Read ADC value
+    // Read ADC value using GPIO handler
     int adc_raw = 0;
-    ret = adc_oneshot_read(adc_handle, config.pin, &adc_raw);
+    ret = gpio_handler_read_analog(&manager->gpio_handler, config.pin, &adc_raw);
     if (ret != ESP_OK) {
         state->error_state = true;
         state->error_count++;
         return ret;
     }
     
-    // Convert to voltage if calibration is available
+    // Convert raw ADC value to engineering units
     float raw_value = (float)adc_raw;
-    if (adc_cali_handle) {
-        int voltage_mv = 0;
-        if (adc_cali_raw_to_voltage(adc_cali_handle, adc_raw, &voltage_mv) == ESP_OK) {
-            raw_value = (float)voltage_mv / 1000.0f; // Convert to volts
-        }
-    }
     
     // Scale to engineering units based on range
     float range_span = config.range_max - config.range_min;
@@ -395,17 +373,6 @@ esp_err_t io_manager_init(io_manager_t* manager, config_manager_t* config_manage
         }
     }
     
-    // Initialize ADC
-    ret = init_adc();
-    if (ret != ESP_OK) {
-#ifdef DEBUG_IO_MANAGER
-        ESP_LOGE(TAG, "Failed to initialize ADC: %s", esp_err_to_name(ret));
-#endif
-        shift_register_handler_destroy(&manager->shift_register_handler);
-        gpio_handler_destroy(&manager->gpio_handler);
-        vSemaphoreDelete(manager->state_mutex);
-        return ret;
-    }
     
     // Configure IO points
     ret = configure_io_points(manager);
@@ -595,15 +562,6 @@ void io_manager_destroy(io_manager_t* manager) {
         shift_register_handler_destroy(&manager->shift_register_handler);
         gpio_handler_destroy(&manager->gpio_handler);
         
-        // Cleanup ADC
-        if (adc_cali_handle) {
-            adc_cali_delete_scheme_line_fitting(adc_cali_handle);
-            adc_cali_handle = NULL;
-        }
-        if (adc_handle) {
-            adc_oneshot_del_unit(adc_handle);
-            adc_handle = NULL;
-        }
         
         // Cleanup mutex
         if (manager->state_mutex) {

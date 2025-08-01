@@ -23,6 +23,7 @@
 #include "storage_manager.h"
 #include "config_manager.h"
 #include "io_manager.h"
+#include "io_test_controller.h"
 #include "debug_config.h"
 
 static const char *TAG = "SNRv9_MAIN";
@@ -36,8 +37,7 @@ static io_manager_t io_manager;
  */
 static void on_task_created(const task_info_t *task)
 {
-    ESP_LOGI(TAG, "Task created: %s (Priority: %u)", 
-             task->name, (unsigned int)task->priority);
+    // ESP_LOGI(TAG, "Task created: %s (Priority: %u)", task->name, (unsigned int)task->priority);
 }
 
 /**
@@ -216,6 +216,13 @@ void app_main(void)
         return;
     }
 
+    // Initialize IO test controller with IO manager
+    ESP_LOGI(TAG, "Initializing IO test controller...");
+    if (io_test_controller_init(&io_manager) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize IO test controller");
+        return;
+    }
+
     // Initialize storage manager
     ESP_LOGI(TAG, "Initializing storage manager...");
     if (storage_manager_init() != ESP_OK) {
@@ -246,8 +253,15 @@ void app_main(void)
     
     // Initialize configuration manager
     ESP_LOGI(TAG, "Initializing configuration manager...");
-    if (config_manager_init(&config_manager, "/littlefs/io_config.json") != ESP_OK) {
+    if (config_manager_init(&config_manager, "/io_config.json") != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize configuration manager");
+        return;
+    }
+    
+    // Load configuration from file
+    ESP_LOGI(TAG, "Loading IO configuration...");
+    if (config_manager_load(&config_manager) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to load IO configuration");
         return;
     }
     

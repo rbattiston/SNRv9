@@ -6,6 +6,7 @@
 #include "web_server_manager.h"
 #include "auth_controller.h"
 #include "system_controller.h"
+#include "io_test_controller.h"
 #include "debug_config.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -170,6 +171,15 @@ bool web_server_manager_start(void)
     // Initialize system controller
     if (!system_controller_init(g_web_server.server_handle)) {
         ESP_LOGE(TAG, "Failed to initialize system controller");
+        httpd_stop(g_web_server.server_handle);
+        g_web_server.server_handle = NULL;
+        g_web_server.status = WEB_SERVER_ERROR;
+        return false;
+    }
+
+    // Register IO test controller routes
+    if (io_test_controller_register_routes(g_web_server.server_handle) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register IO test controller routes");
         httpd_stop(g_web_server.server_handle);
         g_web_server.server_handle = NULL;
         g_web_server.status = WEB_SERVER_ERROR;

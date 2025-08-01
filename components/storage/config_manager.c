@@ -298,8 +298,11 @@ esp_err_t config_manager_init(config_manager_t* manager, const char* config_file
 
 esp_err_t config_manager_load(config_manager_t* manager) {
     if (!manager || !manager->initialized) {
+        ESP_LOGE(TAG, "Config manager not initialized");
         return ESP_ERR_INVALID_STATE;
     }
+    
+    ESP_LOGI(TAG, "Loading configuration from: %s", manager->config_file_path);
     
     // Read file content
     char* file_content = NULL;
@@ -308,23 +311,24 @@ esp_err_t config_manager_load(config_manager_t* manager) {
     esp_err_t ret = storage_manager_read_file(manager->config_file_path, &file_content, &file_size);
     if (ret != ESP_OK) {
         manager->error_count++;
-#ifdef DEBUG_CONFIG_MANAGER
-        ESP_LOGE(TAG, "Failed to read config file: %s", esp_err_to_name(ret));
-#endif
+        ESP_LOGE(TAG, "Failed to read config file '%s': %s", manager->config_file_path, esp_err_to_name(ret));
         return ret;
     }
     
+    ESP_LOGI(TAG, "Successfully read config file: %zu bytes", file_size);
+    
     // Parse JSON
     cJSON* json = cJSON_Parse(file_content);
-    free(file_content);
-    
     if (!json) {
         manager->error_count++;
-#ifdef DEBUG_CONFIG_MANAGER
-        ESP_LOGE(TAG, "Failed to parse JSON config");
-#endif
+        ESP_LOGE(TAG, "Failed to parse JSON config - invalid JSON format");
+        ESP_LOGE(TAG, "JSON content preview (first 200 chars): %.200s", file_content);
+        free(file_content);
         return ESP_ERR_INVALID_ARG;
     }
+    
+    free(file_content);
+    ESP_LOGI(TAG, "Successfully parsed JSON configuration");
     
     // Clear current configuration
     memset(&manager->config, 0, sizeof(io_config_t));
@@ -332,32 +336,62 @@ esp_err_t config_manager_load(config_manager_t* manager) {
     // Parse shift register configuration
     ret = parse_shift_register_config(json, &manager->config.shift_register_config);
     if (ret != ESP_OK) {
-#ifdef DEBUG_CONFIG_MANAGER
-        ESP_LOGW(TAG, "No shift register config found");
-#endif
+        ESP_LOGW(TAG, "No shift register config found in JSON");
+    } else {
+        ESP_LOGI(TAG, "Loaded shift register config: %d output registers, %d input registers", 
+                 manager->config.shift_register_config.num_output_registers,
+                 manager->config.shift_register_config.num_input_registers);
     }
     
     // Parse IO points
     cJSON* io_points = cJSON_GetObjectItem(json, "ioPoints");
-    if (io_points && cJSON_IsArray(io_points)) {
-        int array_size = cJSON_GetArraySize(io_points);
-        int parsed_count = 0;
-        
-        for (int i = 0; i < array_size && parsed_count < CONFIG_MAX_IO_POINTS; i++) {
-            cJSON* point_json = cJSON_GetArrayItem(io_points, i);
-            if (point_json) {
-                io_point_config_t* point_config = &manager->config.io_points[parsed_count];
-                if (parse_io_point(point_json, point_config) == ESP_OK) {
-                    parsed_count++;
-                }
+    if (!io_points) {
+        ESP_LOGE(TAG, "No 'ioPoints' array found in JSON");
+        cJSON_Delete(json);
+        return ESP_ERR_NOT_FOUND;
+    }
+    
+    if (!cJSON_IsArray(io_points)) {
+        ESP_LOGE(TAG, "'ioPoints' is not an array in JSON");
+        cJSON_Delete(json);
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    int array_size = cJSON_GetArraySize(io_points);
+    ESP_LOGI(TAG, "Found ioPoints array with %d items", array_size);
+    
+    int parsed_count = 0;
+    int failed_count = 0;
+    
+    for (int i = 0; i < array_size && parsed_count < CONFIG_MAX_IO_POINTS; i++) {
+        cJSON* point_json = cJSON_GetArrayItem(io_points, i);
+        if (point_json) {
+            io_point_config_t* point_config = &manager->config.io_points[parsed_count];
+            esp_err_t parse_ret = parse_io_point(point_json, point_config);
+            if (parse_ret == ESP_OK) {
+                ESP_LOGI(TAG, "  [%d] Parsed IO point: %s (type: %d)", 
+                         parsed_count, point_config->id, point_config->type);
+                parsed_count++;
+            } else {
+                ESP_LOGW(TAG, "  [%d] Failed to parse IO point at index %d: %s", 
+                         failed_count, i, esp_err_to_name(parse_ret));
+                failed_count++;
             }
+        } else {
+            ESP_LOGW(TAG, "  [%d] NULL IO point at index %d", failed_count, i);
+            failed_count++;
         }
-        
-        manager->config.io_point_count = parsed_count;
-        
-#ifdef DEBUG_CONFIG_MANAGER
-        ESP_LOGI(TAG, "Loaded %d IO points from config", parsed_count);
-#endif
+    }
+    
+    manager->config.io_point_count = parsed_count;
+    
+    ESP_LOGI(TAG, "Configuration loading complete:");
+    ESP_LOGI(TAG, "  - Successfully parsed: %d IO points", parsed_count);
+    ESP_LOGI(TAG, "  - Failed to parse: %d IO points", failed_count);
+    ESP_LOGI(TAG, "  - Total in file: %d IO points", array_size);
+    
+    if (parsed_count == 0) {
+        ESP_LOGE(TAG, "No IO points were successfully parsed!");
     }
     
     cJSON_Delete(json);
