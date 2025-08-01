@@ -128,7 +128,7 @@ bool web_server_manager_start(void)
     config.max_uri_handlers = g_web_server.config.max_uri_handlers;
     config.max_open_sockets = g_web_server.config.max_open_sockets;
     config.task_priority = g_web_server.config.task_priority;
-    config.stack_size = 4096; // Default stack size, can be adjusted
+    config.stack_size = 6144; // Increased stack size for large file operations
     
     ESP_LOGI(TAG, "HTTP server config: main_stack=%lu", 
              (unsigned long)config.stack_size);
