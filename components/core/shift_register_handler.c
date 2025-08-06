@@ -64,14 +64,39 @@ esp_err_t shift_register_handler_init(shift_register_handler_t* handler, const s
                 return ret;
             }
             
-            // Enable outputs (active low)
-            gpio_set_level(config->output_enable_pin, 0);
+            // SAFETY FIRST: Disable outputs during initialization (active low, so HIGH = disabled)
+            gpio_set_level(config->output_enable_pin, 1);
         }
         
         // Initialize output pins
         gpio_set_level(config->output_clock_pin, 0);
         gpio_set_level(config->output_latch_pin, 0);
         gpio_set_level(config->output_data_pin, 0);
+        
+        // CRITICAL SAFETY: Initialize all outputs to safe state (OFF) following reference example
+        // This ensures hardware matches software state before enabling outputs
+        memset(handler->output_states, 0, sizeof(handler->output_states));
+        
+        // CRITICAL FIX: Set initialized flag BEFORE calling write function to avoid circular dependency
+        handler->initialized = true;
+        
+        // Write safe state to hardware immediately (like Send_74HC595(0) in reference)
+        esp_err_t write_ret = shift_register_write_outputs(handler);
+        if (write_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to write safe state to shift registers: %s", esp_err_to_name(write_ret));
+            handler->initialized = false;  // Reset on failure
+            vSemaphoreDelete(handler->mutex);
+            return write_ret;
+        }
+        
+        // NOW it's safe to enable outputs (following reference pattern)
+        if (config->output_enable_pin >= 0) {
+            gpio_set_level(config->output_enable_pin, 0);  // LOW = enabled
+            
+#ifdef DEBUG_SHIFT_REGISTER
+            ESP_LOGI(TAG, "Shift register outputs enabled after safe state initialization");
+#endif
+        }
     }
     
     // Configure GPIO pins for input shift registers
@@ -112,9 +137,17 @@ esp_err_t shift_register_handler_init(shift_register_handler_t* handler, const s
         // Initialize input pins
         gpio_set_level(config->input_clock_pin, 1);  // Clock idle high
         gpio_set_level(config->input_load_pin, 1);   // Load idle high
+        
+        // Set initialized flag if not already set (for input-only configurations)
+        if (!handler->initialized) {
+            handler->initialized = true;
+        }
+    } else {
+        // For output-only configurations, ensure initialized flag is set
+        if (!handler->initialized) {
+            handler->initialized = true;
+        }
     }
-    
-    handler->initialized = true;
     
 #ifdef DEBUG_SHIFT_REGISTER
     ESP_LOGI(TAG, "Shift register handler initialized (out: %d, in: %d)", 

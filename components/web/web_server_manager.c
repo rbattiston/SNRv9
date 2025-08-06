@@ -141,7 +141,7 @@ bool web_server_manager_start(void)
         return false;
     }
 
-    // Register API handlers
+    // Register API handlers first (specific routes before catch-all)
     if (!register_api_handlers()) {
         ESP_LOGE(TAG, "Failed to register API handlers");
         httpd_stop(g_web_server.server_handle);
@@ -150,16 +150,7 @@ bool web_server_manager_start(void)
         return false;
     }
 
-    // Register static file handlers
-    if (!static_file_controller_register_handlers(g_web_server.server_handle)) {
-        ESP_LOGE(TAG, "Failed to register static file handlers");
-        httpd_stop(g_web_server.server_handle);
-        g_web_server.server_handle = NULL;
-        g_web_server.status = WEB_SERVER_ERROR;
-        return false;
-    }
-
-    // Initialize authentication controller
+    // Initialize authentication controller (specific /api/auth/* routes)
     if (!auth_controller_init(g_web_server.server_handle)) {
         ESP_LOGE(TAG, "Failed to initialize authentication controller");
         httpd_stop(g_web_server.server_handle);
@@ -168,7 +159,7 @@ bool web_server_manager_start(void)
         return false;
     }
 
-    // Initialize system controller
+    // Initialize system controller (specific /api/system/* routes)
     if (!system_controller_init(g_web_server.server_handle)) {
         ESP_LOGE(TAG, "Failed to initialize system controller");
         httpd_stop(g_web_server.server_handle);
@@ -177,9 +168,18 @@ bool web_server_manager_start(void)
         return false;
     }
 
-    // Register IO test controller routes
+    // Register IO test controller routes (specific /api/io/* routes)
     if (io_test_controller_register_routes(g_web_server.server_handle) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to register IO test controller routes");
+        httpd_stop(g_web_server.server_handle);
+        g_web_server.server_handle = NULL;
+        g_web_server.status = WEB_SERVER_ERROR;
+        return false;
+    }
+
+    // Register static file handlers LAST (catch-all for remaining requests)
+    if (!static_file_controller_register_handlers(g_web_server.server_handle)) {
+        ESP_LOGE(TAG, "Failed to register static file handlers");
         httpd_stop(g_web_server.server_handle);
         g_web_server.server_handle = NULL;
         g_web_server.status = WEB_SERVER_ERROR;

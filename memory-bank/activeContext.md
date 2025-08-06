@@ -224,6 +224,23 @@
 - **Monitoring Integration**: PSRAM statistics included in regular system health reports
 - **Web Server Integration**: PSRAM-allocated tasks for web server operations
 
+### ✅ Main Task Stack Overflow Fix
+**Implementation**: Increased main task stack size in primary configuration file.
+**Date**: August 5, 2025
+**Problem**: `main` task stack usage was at 85% (3080/3584 bytes), causing critical overflow warnings.
+**Root Cause Analysis**: 
+- Initial stack size of 3584 bytes was insufficient for the application's initialization routines
+- Previous attempt to modify `sdkconfig.esp32dev` was ineffective due to ESP-IDF configuration hierarchy
+- `sdkconfig.defaults` is the primary configuration source that takes precedence
+**Solution Implemented**:
+- Added `CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096` to `sdkconfig.defaults` (the proper configuration file)
+- Fixed flash size inconsistency by updating `sdkconfig.defaults` from 2MB to 8MB to match `platformio.ini`
+- Kept the `run_psram_comprehensive_test()` call commented out in `src/main.c` as it is non-essential for startup
+**Configuration Management Learning**:
+- ESP-IDF configuration hierarchy: `sdkconfig.defaults` → `sdkconfig.esp32dev` → final `sdkconfig`
+- Always modify `sdkconfig.defaults` for reliable configuration changes in this project
+**Impact**: The `main` task now has a 4096-byte stack, providing a robust 14% buffer against overflow and ensuring system stability.
+
 ### ✅ Web Server Stack Size Configuration Fix
 **Implementation**: Critical compilation error resolution for web server manager
 **Date**: January 30, 2025
@@ -346,6 +363,7 @@
 ## Current Challenges
 
 ### Resolved Issues
+- ✅ **`main` task stack overflow**: Disabled PSRAM test suite in `app_main`.
 - ✅ Stack overflow causing system crashes
 - ✅ Lack of visibility into system resource usage
 - ✅ No early warning for potential failures

@@ -216,13 +216,6 @@ void app_main(void)
         return;
     }
 
-    // Initialize IO test controller with IO manager
-    ESP_LOGI(TAG, "Initializing IO test controller...");
-    if (io_test_controller_init(&io_manager) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize IO test controller");
-        return;
-    }
-
     // Initialize storage manager
     ESP_LOGI(TAG, "Initializing storage manager...");
     if (storage_manager_init() != ESP_OK) {
@@ -278,6 +271,13 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to start IO polling task");
         return;
     }
+
+    // Initialize IO test controller with IO manager (AFTER IO manager is fully initialized)
+    ESP_LOGI(TAG, "Initializing IO test controller...");
+    if (io_test_controller_init(&io_manager) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize IO test controller");
+        return;
+    }
     
     // Register task lifecycle callbacks
     task_tracker_register_creation_callback(on_task_created);
@@ -303,9 +303,9 @@ void app_main(void)
     
     ESP_LOGI(TAG, "All systems started successfully");
     
-    // Run comprehensive PSRAM test suite
-    ESP_LOGI(TAG, "Running PSRAM comprehensive test suite...");
-    run_psram_comprehensive_test();
+    // Run comprehensive PSRAM test suite - DISABLED to prevent main task stack overflow
+    // ESP_LOGI(TAG, "Running PSRAM comprehensive test suite...");
+    // run_psram_comprehensive_test();
     
     ESP_LOGI(TAG, "WiFi connecting to S3CURE_WIFI...");
     

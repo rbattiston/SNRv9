@@ -9,9 +9,7 @@
 #include "cJSON.h"
 #include <string.h>
 
-#ifdef DEBUG_WEB
 static const char* TAG = "IO_TEST_CTRL";
-#endif
 
 // Global IO manager reference
 static io_manager_t* g_io_manager = NULL;
@@ -20,7 +18,7 @@ static io_manager_t* g_io_manager = NULL;
  * @brief Parse point ID from URI
  */
 static esp_err_t parse_point_id_from_uri(const char* uri, char* point_id, size_t max_len) {
-    // URI format: /api/io/points/{point_id}
+    // URI format: /api/io/points/{point_id} or /api/io/points/{point_id}/set
     const char* prefix = "/api/io/points/";
     size_t prefix_len = strlen(prefix);
     
@@ -29,13 +27,16 @@ static esp_err_t parse_point_id_from_uri(const char* uri, char* point_id, size_t
     }
     
     const char* id_start = uri + prefix_len;
-    const char* id_end = strchr(id_start, '?');
+    const char* id_end = strchr(id_start, '/');  // Look for next '/' (for /set)
     if (!id_end) {
-        id_end = id_start + strlen(id_start);
+        id_end = strchr(id_start, '?');  // Look for query parameters
+    }
+    if (!id_end) {
+        id_end = id_start + strlen(id_start);  // End of string
     }
     
     size_t id_len = id_end - id_start;
-    if (id_len >= max_len) {
+    if (id_len >= max_len || id_len == 0) {
         return ESP_ERR_INVALID_SIZE;
     }
     
@@ -352,19 +353,20 @@ esp_err_t io_test_controller_init(io_manager_t* io_manager) {
     
     g_io_manager = io_manager;
     
-#ifdef DEBUG_WEB
-static const char* TAG = "IO_TEST_CTRL";
-#endif
+    ESP_LOGI(TAG, "IO Test Controller initialized with IO manager reference");
     
     return ESP_OK;
 }
 
 esp_err_t io_test_controller_register_routes(httpd_handle_t server) {
-    if (!server) {
+    if (!server || !g_io_manager) {
+        ESP_LOGE(TAG, "Server handle or IO manager is NULL");
         return ESP_ERR_INVALID_ARG;
     }
-    
-    // GET /api/io/points - Get all IO points
+
+    ESP_LOGI(TAG, "Starting dynamic IO test controller route registration...");
+
+    // Base routes
     httpd_uri_t get_all_points_uri = {
         .uri = "/api/io/points",
         .method = HTTP_GET,
@@ -372,26 +374,8 @@ esp_err_t io_test_controller_register_routes(httpd_handle_t server) {
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &get_all_points_uri);
-    
-    // GET /api/io/points/{id} - Get specific IO point
-    httpd_uri_t get_point_uri = {
-        .uri = "/api/io/points/*",
-        .method = HTTP_GET,
-        .handler = io_test_get_point,
-        .user_ctx = NULL
-    };
-    httpd_register_uri_handler(server, &get_point_uri);
-    
-    // POST /api/io/points/{id}/set - Set binary output state
-    httpd_uri_t set_output_uri = {
-        .uri = "/api/io/points/*/set",
-        .method = HTTP_POST,
-        .handler = io_test_set_output,
-        .user_ctx = NULL
-    };
-    httpd_register_uri_handler(server, &set_output_uri);
-    
-    // GET /api/io/statistics - Get IO system statistics
+    ESP_LOGI(TAG, "Registered: GET /api/io/points");
+
     httpd_uri_t get_statistics_uri = {
         .uri = "/api/io/statistics",
         .method = HTTP_GET,
@@ -399,10 +383,47 @@ esp_err_t io_test_controller_register_routes(httpd_handle_t server) {
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &get_statistics_uri);
-    
-#ifdef DEBUG_WEB
-    ESP_LOGI(TAG, "IO Test Controller routes registered");
-#endif
-    
+    ESP_LOGI(TAG, "Registered: GET /api/io/statistics");
+
+    // Dynamically register routes for each IO point
+    char point_ids[32][CONFIG_MAX_ID_LENGTH];
+    int point_count = 0;
+    io_manager_get_all_point_ids(g_io_manager, point_ids, 32, &point_count);
+
+    for (int i = 0; i < point_count; i++) {
+        io_point_config_t config;
+        if (config_manager_get_io_point_config(g_io_manager->config_manager, point_ids[i], &config) == ESP_OK) {
+            
+            // Register GET /api/io/points/{id}
+            char* get_uri = malloc(strlen("/api/io/points/") + strlen(config.id) + 1);
+            sprintf(get_uri, "/api/io/points/%s", config.id);
+            
+            httpd_uri_t get_point_uri = {
+                .uri = get_uri,
+                .method = HTTP_GET,
+                .handler = io_test_get_point,
+                .user_ctx = (void*)get_uri // Pass URI to be freed later
+            };
+            httpd_register_uri_handler(server, &get_point_uri);
+            ESP_LOGI(TAG, "Registered: GET %s", get_uri);
+
+            // If it's a binary output, register the POST .../set route
+            if (config.type == IO_POINT_TYPE_GPIO_BO || config.type == IO_POINT_TYPE_SHIFT_REG_BO) {
+                char* set_uri = malloc(strlen("/api/io/points/") + strlen(config.id) + strlen("/set") + 1);
+                sprintf(set_uri, "/api/io/points/%s/set", config.id);
+
+                httpd_uri_t set_output_uri = {
+                    .uri = set_uri,
+                    .method = HTTP_POST,
+                    .handler = io_test_set_output,
+                    .user_ctx = (void*)set_uri // Pass URI to be freed later
+                };
+                httpd_register_uri_handler(server, &set_output_uri);
+                ESP_LOGI(TAG, "Registered: POST %s", set_uri);
+            }
+        }
+    }
+
+    ESP_LOGI(TAG, "IO Test Controller routes registered successfully");
     return ESP_OK;
 }

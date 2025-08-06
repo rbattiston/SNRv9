@@ -82,15 +82,25 @@ esp_err_t gpio_handler_configure_output(gpio_handler_t* handler, int pin, bool i
         return ret;
     }
     
-    // Set initial state
-    ret = gpio_set_level(pin, initial_state ? 1 : 0);
+    // SAFETY: Always set to safe state (OFF/LOW) first, regardless of initial_state parameter
+    // This ensures outputs start in a known safe state for irrigation control
+    ret = gpio_set_level(pin, 0);  // Always start LOW (OFF)
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set initial state for GPIO %d: %s", pin, esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to set safe state for GPIO %d: %s", pin, esp_err_to_name(ret));
         return ret;
     }
     
+    // Only set to requested initial state if it's not the safe state
+    if (initial_state) {
+        ret = gpio_set_level(pin, 1);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to set initial state for GPIO %d: %s", pin, esp_err_to_name(ret));
+            return ret;
+        }
+    }
+    
 #ifdef DEBUG_GPIO_HANDLER
-    ESP_LOGI(TAG, "Configured GPIO %d as output (initial: %s)", pin, initial_state ? "HIGH" : "LOW");
+    ESP_LOGI(TAG, "Configured GPIO %d as output (safe init, final: %s)", pin, initial_state ? "HIGH" : "LOW");
 #endif
     
     return ESP_OK;

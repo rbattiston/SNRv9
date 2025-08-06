@@ -23,7 +23,7 @@
   - `esp_timer`: High-resolution timer
   - `heap`: Memory management
   - `esp_system`: System utilities
-  - `esp_http_server`: HTTP server functionality (Step 2+)
+  - `esp_http_server`: HTTP server functionality (Step 2+). **Note**: This component has a very basic wildcard router. See "Web Server API Development" section for critical limitations and required patterns.
   - `esp_wifi`: WiFi connectivity (Step 1+)
   - `esp_event`: Event handling system
   - `nvs_flash`: Non-volatile storage
@@ -166,3 +166,11 @@ SNRv9/
 - **Branching**: Feature branches for development
 - **Commits**: Descriptive commit messages with issue references
 - **Documentation**: Memory bank maintained alongside code changes
+
+### Web Server API Development
+**CRITICAL: ESP-IDF HTTP Server Limitations (Discovered August 5, 2025)**
+- **Wildcard Routing**: The `esp_http_server` component's wildcard (`*`) is extremely limited.
+  - It only matches a **single path segment**.
+  - It **cannot** be used in the middle of a URI pattern (e.g., `/api/items/*/action` is invalid).
+- **Required Pattern**: Due to these limitations, the only reliable method for creating RESTful APIs with dynamic IDs is to **dynamically generate and register the full, explicit URI for each endpoint at startup**.
+- **Reference**: See the "Dynamic and Explicit Route Registration Pattern" in `memory-bank/systemPatterns.md` for the full implementation details. All future API development must follow this pattern to avoid 404 errors.

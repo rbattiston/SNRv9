@@ -742,29 +742,60 @@ static uint32_t estimate_task_stack_size(const char *task_name)
         return DEFAULT_STACK_SIZE;
     }
 
-    // Known task stack sizes based on our configuration
-    if (strcmp(task_name, "task_tracker") == 0) {
+    // Use configuration-based stack sizes where available
+    if (strcmp(task_name, "main") == 0) {
+        #ifdef CONFIG_ESP_MAIN_TASK_STACK_SIZE
+            return CONFIG_ESP_MAIN_TASK_STACK_SIZE;
+        #else
+            return 3584; // Fallback for older ESP-IDF versions
+        #endif
+    } else if (strcmp(task_name, "tiT") == 0) {
+        #ifdef CONFIG_LWIP_TCPIP_TASK_STACK_SIZE
+            return CONFIG_LWIP_TCPIP_TASK_STACK_SIZE;
+        #else
+            return 4096; // Fallback
+        #endif
+    } else if (strcmp(task_name, "sys_evt") == 0) {
+        #ifdef CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE
+            return CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE;
+        #else
+            return 2304; // Fallback
+        #endif
+    } else if (strcmp(task_name, "esp_timer") == 0) {
+        #ifdef CONFIG_ESP_TIMER_TASK_STACK_SIZE
+            return CONFIG_ESP_TIMER_TASK_STACK_SIZE;
+        #else
+            return 3584; // Fallback
+        #endif
+    } else if (strcmp(task_name, "ipc0") == 0 || strcmp(task_name, "ipc1") == 0) {
+        #ifdef CONFIG_ESP_IPC_TASK_STACK_SIZE
+            return CONFIG_ESP_IPC_TASK_STACK_SIZE;
+        #else
+            return 1024; // Fallback
+        #endif
+    } else if (strcmp(task_name, "Tmr Svc") == 0) {
+        #ifdef CONFIG_FREERTOS_TIMER_TASK_STACK_DEPTH
+            return CONFIG_FREERTOS_TIMER_TASK_STACK_DEPTH;
+        #else
+            return 2048; // Fallback
+        #endif
+    } else if (strncmp(task_name, "IDLE", 4) == 0) {
+        #ifdef CONFIG_FREERTOS_IDLE_TASK_STACKSIZE
+            return CONFIG_FREERTOS_IDLE_TASK_STACKSIZE;
+        #else
+            return 1536; // Fallback
+        #endif
+    }
+    
+    // Known task stack sizes based on our local configuration
+    else if (strcmp(task_name, "task_tracker") == 0) {
         return TASK_TRACKER_STACK_SIZE;
     } else if (strcmp(task_name, "mem_monitor") == 0) {
         return MEMORY_MONITOR_STACK_SIZE;
     } else if (strcmp(task_name, "wifi_monitor") == 0) {
         return WIFI_MONITOR_STACK_SIZE;
     } else if (strcmp(task_name, "wifi") == 0) {
-        return 6656; // ESP-IDF WiFi task stack size
-    } else if (strcmp(task_name, "esp_timer") == 0) {
-        return 3584; // ESP-IDF timer task stack size
-    } else if (strcmp(task_name, "tiT") == 0) {
-        return 4096; // TCP/IP task - increased from 2048
-    } else if (strcmp(task_name, "sys_evt") == 0) {
-        return 2304; // System event task
-    } else if (strcmp(task_name, "ipc0") == 0 || strcmp(task_name, "ipc1") == 0) {
-        return 1024; // IPC tasks
-    } else if (strcmp(task_name, "Tmr Svc") == 0) {
-        return 2048; // Timer service task
-    } else if (strncmp(task_name, "IDLE", 4) == 0) {
-        return 1536; // IDLE tasks
-    } else if (strcmp(task_name, "main") == 0) {
-        return 3584; // Main task
+        return 6656; // ESP-IDF WiFi task stack size (not easily configurable)
     }
 
     // Default for unknown tasks

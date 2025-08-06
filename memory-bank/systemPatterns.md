@@ -445,6 +445,15 @@ HTTP Request → ESP-IDF HTTP Server → URI Handler → Controller → Manager 
 - Memory monitoring of HTTP server heap usage
 - Configuration following ESP-IDF best practices
 
+**CRITICAL: Dynamic and Explicit Route Registration Pattern (Discovered August 5, 2025)**
+**Problem**: The ESP-IDF HTTP server's wildcard router (`*`) is extremely limited. It cannot match multi-segment paths (e.g., `/api/io/points/ID_1/set`) and does not support wildcards in the middle of a URI pattern (e.g., `/api/io/points/*/set`).
+**Solution**: Bypass the wildcard limitations by dynamically generating and registering an exact-match route for every controllable endpoint at startup.
+**Implementation (`io_test_controller.c`)**:
+1.  **Read Configuration**: At initialization, get a list of all configured IO points from the `io_manager`.
+2.  **Iterate and Generate**: Loop through each point. If it's a controllable output, dynamically allocate and create the full, explicit URI string (e.g., `/api/io/points/SR_OUT_0_0/set`).
+3.  **Register Exact Route**: Create a new `httpd_uri_t` for the generated string and register it with `httpd_register_uri_handler`.
+4.  **Result**: The server has a hardcoded list of all valid routes, ensuring 100% reliable matching without relying on the faulty wildcard system. This is the required pattern for all complex, multi-endpoint APIs in this project.
+
 ### 3. Periodic Reporting
 - Automatic reports based on configurable intervals
 - Manual report triggering for debugging

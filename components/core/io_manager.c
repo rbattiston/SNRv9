@@ -159,10 +159,14 @@ static esp_err_t configure_io_points(io_manager_t* manager) {
                 
             case IO_POINT_TYPE_GPIO_BO:
                 if (config->pin >= 0) {
-                    bool initial_state = config->is_inverted ? 1 : 0;
-                    ESP_LOGI(TAG, "  Configuring GPIO binary output on pin %d (initial: %d)", 
-                             config->pin, initial_state);
-                    gpio_handler_configure_output(&manager->gpio_handler, config->pin, initial_state);
+                    // SAFETY: Always start with safe state (OFF), gpio_handler now enforces this
+                    ESP_LOGI(TAG, "  Configuring GPIO binary output on pin %d (SAFE INIT)", config->pin);
+                    gpio_handler_configure_output(&manager->gpio_handler, config->pin, false);  // Always start OFF
+                    
+                    // Initialize runtime state to match safe hardware state
+                    state->digital_state = false;  // OFF state
+                    state->raw_value = 0.0f;
+                    state->conditioned_value = 0.0f;
                 } else {
                     ESP_LOGW(TAG, "  Invalid pin %d for GPIO BO point %s", config->pin, config->id);
                 }
@@ -174,8 +178,15 @@ static esp_err_t configure_io_points(io_manager_t* manager) {
                 break;
                 
             case IO_POINT_TYPE_SHIFT_REG_BO:
-                ESP_LOGI(TAG, "  Configuring shift register binary output (chip: %d, bit: %d)", 
+                ESP_LOGI(TAG, "  Configuring shift register binary output (chip: %d, bit: %d) (SAFE INIT)", 
                          config->chip_index, config->bit_index);
+                
+                // SAFETY: Initialize shift register output to safe state (OFF)
+                // The shift register handler already initializes all outputs to 0 during init
+                // Just ensure runtime state matches the safe hardware state
+                state->digital_state = false;  // OFF state
+                state->raw_value = 0.0f;
+                state->conditioned_value = 0.0f;
                 break;
                 
             default:
