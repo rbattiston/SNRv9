@@ -295,6 +295,38 @@
             margin: 10px 0;
         }
 
+        .refresh-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-left: 10px;
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        .refresh-indicator.inactive {
+            background: #6c757d;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .section-header.refreshing {
+            background: linear-gradient(90deg, #f8f9fa 0%, #e3f2fd 50%, #f8f9fa 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
         @media (max-width: 768px) {
             .controls {
                 flex-direction: column;
@@ -326,11 +358,19 @@
             <div class="auto-refresh">
                 <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
                 <label for="autoRefresh">Auto Refresh</label>
+                <select id="refreshScope">
+                    <option value="all">All Data</option>
+                    <option value="inputs" selected>AIs + BIs Only</option>
+                    <option value="ai">AIs Only</option>
+                    <option value="bi">BIs Only</option>
+                </select>
                 <select id="refreshInterval">
                     <option value="1000">1s</option>
                     <option value="2000" selected>2s</option>
                     <option value="5000">5s</option>
                     <option value="10000">10s</option>
+                    <option value="15000">15s</option>
+                    <option value="30000">30s</option>
                 </select>
             </div>
 
@@ -398,6 +438,12 @@
     <script>
         let autoRefreshInterval = null;
         let ioPoints = [];
+        let lastRefreshTimes = {
+            all: null,
+            statistics: null,
+            analogInputs: null,
+            binaryInputs: null
+        };
 
         // Initialize the page
         document.addEventListener('DOMContentLoaded', function() {
@@ -442,6 +488,70 @@
                 displayIOPoints();
             } catch (error) {
                 showError('Failed to load IO points: ' + error.message);
+            }
+        }
+
+        // Refresh only analog inputs
+        async function refreshAnalogInputs() {
+            try {
+                const response = await fetch('/api/io/points');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                ioPoints = data.points || [];
+                
+                // Update only analog inputs section
+                const analogInputs = ioPoints.filter(p => p.type === 'GPIO_AI');
+                document.getElementById('analogInputs').innerHTML = analogInputs.map(createIOCard).join('');
+                
+                lastRefreshTimes.analogInputs = new Date();
+                updateLastUpdateTime('AIs');
+            } catch (error) {
+                showError('Failed to refresh analog inputs: ' + error.message);
+            }
+        }
+
+        // Refresh only binary inputs
+        async function refreshBinaryInputs() {
+            try {
+                const response = await fetch('/api/io/points');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                ioPoints = data.points || [];
+                
+                // Update only binary inputs section
+                const binaryInputs = ioPoints.filter(p => p.type === 'SHIFT_REG_BI' || p.type === 'GPIO_BI');
+                document.getElementById('binaryInputs').innerHTML = binaryInputs.map(createIOCard).join('');
+                
+                lastRefreshTimes.binaryInputs = new Date();
+                updateLastUpdateTime('BIs');
+            } catch (error) {
+                showError('Failed to refresh binary inputs: ' + error.message);
+            }
+        }
+
+        // Refresh both analog and binary inputs
+        async function refreshInputs() {
+            try {
+                const response = await fetch('/api/io/points');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                ioPoints = data.points || [];
+                
+                // Update both input sections
+                const analogInputs = ioPoints.filter(p => p.type === 'GPIO_AI');
+                const binaryInputs = ioPoints.filter(p => p.type === 'SHIFT_REG_BI' || p.type === 'GPIO_BI');
+                
+                document.getElementById('analogInputs').innerHTML = analogInputs.map(createIOCard).join('');
+                document.getElementById('binaryInputs').innerHTML = binaryInputs.map(createIOCard).join('');
+                
+                lastRefreshTimes.analogInputs = new Date();
+                lastRefreshTimes.binaryInputs = new Date();
+                updateLastUpdateTime('AIs + BIs');
+            } catch (error) {
+                showError('Failed to refresh inputs: ' + error.message);
             }
         }
 
@@ -642,11 +752,38 @@
         // Auto refresh functionality
         function toggleAutoRefresh() {
             const checkbox = document.getElementById('autoRefresh');
+            const scope = document.getElementById('refreshScope').value;
             const interval = parseInt(document.getElementById('refreshInterval').value);
             
             if (checkbox.checked) {
-                autoRefreshInterval = setInterval(refreshAll, interval);
-                showSuccess('Auto refresh enabled');
+                // Determine which refresh function to use based on scope
+                let refreshFunction;
+                let scopeDescription;
+                
+                switch (scope) {
+                    case 'all':
+                        refreshFunction = refreshAll;
+                        scopeDescription = 'all data';
+                        break;
+                    case 'inputs':
+                        refreshFunction = refreshInputs;
+                        scopeDescription = 'AIs + BIs';
+                        break;
+                    case 'ai':
+                        refreshFunction = refreshAnalogInputs;
+                        scopeDescription = 'analog inputs';
+                        break;
+                    case 'bi':
+                        refreshFunction = refreshBinaryInputs;
+                        scopeDescription = 'binary inputs';
+                        break;
+                    default:
+                        refreshFunction = refreshAll;
+                        scopeDescription = 'all data';
+                }
+                
+                autoRefreshInterval = setInterval(refreshFunction, interval);
+                showSuccess(`Auto refresh enabled for ${scopeDescription} (${interval/1000}s interval)`);
             } else {
                 if (autoRefreshInterval) {
                     clearInterval(autoRefreshInterval);
@@ -657,8 +794,9 @@
         }
 
         // Update last update time
-        function updateLastUpdateTime() {
-            document.getElementById('lastUpdate').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+        function updateLastUpdateTime(scope = 'All') {
+            const timeString = new Date().toLocaleTimeString();
+            document.getElementById('lastUpdate').textContent = `Last updated (${scope}): ${timeString}`;
         }
 
         // Show success message
