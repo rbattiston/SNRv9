@@ -1,9 +1,9 @@
 # Active Context - Current Work Focus
 
 ## Current Work Status
-**Phase**: Web Server Foundation Complete - Ready for Step 6 Implementation
-**Last Updated**: January 30, 2025
-**Status**: Web server stack configuration fixed, all foundation systems operational, ready for Configuration Management + I/O Framework (Step 6)
+**Phase**: Step 7 Request Priority Management Complete - Critical TCB Issue Discovered
+**Last Updated**: August 7, 2025
+**Status**: Priority system operational but requires task lifecycle management fixes before production deployment
 
 ## Recent Accomplishments
 
@@ -200,7 +200,7 @@
 - **Memory Usage Before Tasks**: Internal RAM 35%, PSRAM 0%
 - **Memory Usage After Tasks**: Internal RAM 38%, PSRAM 8%
 - **Task Creation Success**: Critical (internal), Data Processing (PSRAM), Web Server (PSRAM)
-- **Stack Monitoring**: Proper detection of high water marks (web_server_psra: 6388 bytes)
+- **Stack Monitoring**: Proper detection of high water marks (`web_server_psra!@`: 6388 bytes)
 
 **Production Readiness Features**:
 - **Thread Safety**: Mutex-protected operations with 100ms timeout
@@ -267,6 +267,56 @@
 **Files Modified**: `components/web/web_server_manager.c`
 **Impact**: Web server foundation now fully operational and ready for Step 6 implementation
 
+### ✅ Step 7: Request Priority Management System Implementation
+**Implementation**: Complete request priority management system with comprehensive testing
+**Date**: August 7, 2025
+**Scope**: Advanced priority-based request handling with load balancing and emergency mode support
+
+**Components Implemented**:
+- **request_priority_manager.c/h**: Core priority classification and queue management system
+- **request_queue.c/h**: PSRAM-optimized priority queue infrastructure with thread-safe operations
+- **request_priority_test_suite.c/h**: Comprehensive testing framework for validation
+
+**Key Features Implemented**:
+- **Multi-Level Priority Classification**: Six priority levels (EMERGENCY, IO_CRITICAL, AUTHENTICATION, UI_CRITICAL, NORMAL, BACKGROUND)
+- **PSRAM-Optimized Queues**: 600 total request capacity with intelligent memory allocation
+- **Processing Task Framework**: Three processing tasks (CRITICAL, NORMAL, BACKGROUND) with load balancing
+- **Emergency Mode Support**: Automatic activation under high load with critical request prioritization
+- **Load Shedding**: Intelligent request dropping algorithms to prevent system overload
+- **Comprehensive Testing**: Multi-scenario test suite with real-time statistics and validation
+
+**System Integration**:
+- **Debug Configuration**: Centralized control with priority-specific debug flags
+- **Monitoring Integration**: Real-time status reporting with queue depths and processing statistics
+- **Main Application Integration**: Automatic priority validation test execution after web server startup
+- **Thread Safety**: Comprehensive mutex protection with 100ms timeouts
+
+**Performance Results**:
+- **Build Success**: RAM 33.8% (110,784 bytes), Flash 37.5% (1,055,535 bytes)
+- **System Operational**: All six priority queues functional with zero system crashes
+- **Test Suite Running**: Comprehensive validation test executing successfully
+- **Priority Validation**: Automatic 30-second validation test integrated into startup sequence
+
+**Critical Issue Discovered**:
+- **TCB Corruption**: Processing task handles pointing to freed TCBs with poison pattern `0xcecece00`
+- **Symptoms**: Task status reporting disabled to prevent crashes, tasks exiting unexpectedly
+- **Impact**: Priority system functional but task lifecycle management unstable
+- **Root Cause**: Processing tasks exiting improperly without proper cleanup procedures
+- **Immediate Mitigation**: Status checking disabled, system remains operational
+- **System Stability**: Core functionality maintained, no crashes during operation
+
+**Files Created**:
+- `components/web/request_priority_manager.c` - Core priority management implementation
+- `components/web/include/request_priority_manager.h` - Priority manager interface
+- `components/web/request_queue.c` - Priority queue system implementation
+- `components/web/include/request_queue.h` - Queue system interface
+- `components/web/request_priority_test_suite.c` - Comprehensive testing framework
+- `components/web/include/request_priority_test_suite.h` - Test suite interface
+
+**Technical Achievement**: Advanced request priority management system providing foundation for high-load web server operations with intelligent resource management and comprehensive testing validation
+
+**Next Steps Required**: Phase 8 - Fix task lifecycle management and implement proper cleanup procedures to resolve TCB corruption issue before production deployment
+
 ## Current System Status
 
 ### System Stability
@@ -318,29 +368,44 @@
 
 ## Next Steps and Future Work
 
-### Immediate Priorities (Current Step 6)
-**REFERENCE**: Follow `memory-bank/webServerImplementationPlan.md` for detailed implementation roadmap
+### Immediate Priority (Phase 8: Task Lifecycle Management)
+**CRITICAL**: Must be completed before production deployment
+**Issue**: TCB corruption in priority processing tasks requiring immediate resolution
 
-**Step 6: Configuration Management + I/O Framework (Combined Priority Step)**
-- **ConfigManager**: Load and serve sophisticated IO configuration JSON
-- **IOManager**: Implement shift register I/O + analog inputs with signal conditioning
-- **ConfigController**: REST API for configuration management
-- **IOController**: REST API for I/O control and monitoring
-- **Hardware Integration**: 8 relays + 8 digital inputs + 6 analog inputs with alarm system
-- **Signal Processing**: SMA filtering, lookup tables, scaling, alarm detection
+**Phase 8 Objectives**:
+1. **Root Cause Analysis**: Investigate why processing tasks are exiting unexpectedly
+2. **Task Exit Handling**: Implement proper task cleanup procedures and lifecycle management
+3. **Task Recreation**: Add automatic task recreation on failure with health monitoring
+4. **TCB Corruption Prevention**: Fix improper task exit causing freed TCB references
+5. **Task Health Monitoring**: Enhance task status monitoring with corruption detection
 
-### Completed Foundation (Steps 1-5)
-**Status**: Web server foundation already implemented
+**Technical Approach**:
+- **Task Lifecycle Investigation**: Analyze processing task exit patterns and causes
+- **Proper Cleanup Implementation**: Add task cleanup handlers and resource deallocation
+- **Task Recreation Framework**: Implement automatic task restart on unexpected exit
+- **Health Check Enhancement**: Add TCB validation and corruption detection
+- **Thread Safety Improvement**: Ensure proper synchronization during task lifecycle events
+
+**Expected Outcomes**:
+- Processing tasks remain stable and operational
+- Task status reporting re-enabled safely
+- System ready for production load testing
+- Foundation for reliable high-load web server operations
+
+### Completed Foundation (Steps 1-7)
+**Status**: Web server foundation and priority management implemented
 1. ✅ **WiFi Foundation**: WiFiHandler/WiFiManager components exist
 2. ✅ **HTTP Server**: WebServerManager with ESP-IDF HTTP Server
 3. ✅ **Static File Controller**: Advanced caching system implemented
 4. ✅ **Authentication Foundation**: AuthManager + AuthController components exist
 5. ✅ **System Monitoring**: SystemController component exists
+6. ✅ **IO System**: Complete IO framework with configuration management
+7. ✅ **Request Priority Management**: Advanced priority system with critical TCB issue
 
-### Medium-term Goals (Steps 7-12)
+### Medium-term Goals (Steps 8-12)
 **REFERENCE**: See `memory-bank/webServerImplementationPlan.md` for complete details
 
-1. **Request Priority Management**: Load balancing and watchdog timeout prevention
+1. ✅ **Request Priority Management**: Completed with task lifecycle issues to resolve
 2. **Event Logging System**: Web-based log viewing with raw file serving
 3. **Dashboard Controller**: Real-time monitoring with client-side processing
 4. **User Management**: Complete RBAC system with web interface

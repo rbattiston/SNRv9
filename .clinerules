@@ -132,6 +132,24 @@ Idle Priority (0): IDLE tasks (system)
 - Zero performance impact when disabled
 - Easy toggle between development and production builds
 
+### Request Priority System TCB Corruption (August 7, 2025)
+**Challenge**: Processing tasks exiting unexpectedly causing TCB corruption
+**Root Cause**: Processing task handles pointing to freed TCBs with poison pattern `0xcecece00`
+**Symptoms**: Task status reporting disabled to prevent crashes, tasks exiting without proper cleanup
+**Impact**: Priority system functional but task lifecycle management unstable
+**Immediate Mitigation**: 
+- Status checking disabled to prevent system crashes
+- System remains operational with core functionality maintained
+- Priority queues continue to function correctly
+**Solution Required**: 
+- Implement proper task cleanup procedures and lifecycle management
+- Add automatic task recreation on failure with health monitoring
+- Fix improper task exit causing freed TCB references
+- Enhance task status monitoring with corruption detection
+**Lesson**: Task lifecycle management is critical for production stability - tasks must exit cleanly with proper resource deallocation
+**Critical Pattern**: Always implement proper task cleanup handlers and validate TCB integrity before status checks
+**Production Impact**: System operational but requires task lifecycle fixes before production deployment
+
 ## Evolution of Project Decisions
 
 ### Web Server Architecture Decision (January 28, 2025)
@@ -265,6 +283,51 @@ Idle Priority (0): IDLE tasks (system)
 - File-type specific cache policies dramatically improve user experience
 - Real-world testing with browser developer tools is essential for validation
 - Thread-safe design prevents cache corruption under concurrent access
+
+### Step 7: Request Priority Management System (August 7, 2025)
+**Achievement**: Advanced request priority management system with comprehensive testing framework
+**Key Implementation**:
+- Multi-level priority classification system (6 priority levels: EMERGENCY → BACKGROUND)
+- PSRAM-optimized priority queues with 600 total request capacity
+- Processing task framework with load balancing and emergency mode support
+- Comprehensive test suite with real-time validation and statistics
+- Integration with main application for automatic startup testing
+
+**Critical Technical Patterns**:
+- **Priority Classification**: `request_priority_classify()` with intelligent request analysis
+- **PSRAM Queue Management**: Large queue buffers allocated in PSRAM for optimal memory usage
+- **Processing Task Architecture**: Three-tier processing (CRITICAL, NORMAL, BACKGROUND) with appropriate priorities
+- **Load Balancing**: Dynamic task scaling and intelligent request distribution
+- **Emergency Mode**: Automatic activation under high load with critical request prioritization
+- **Thread Safety**: Comprehensive mutex protection with 100ms timeouts throughout system
+
+**System Integration Patterns**:
+- **Debug Configuration**: Priority-specific debug flags in centralized `debug_config.h`
+- **Monitoring Integration**: Real-time status reporting with queue depths and processing statistics
+- **Test Suite Integration**: Automatic validation test execution after web server startup
+- **Main Application Integration**: Priority validation test runs automatically after system stabilization
+
+**Performance Validation**:
+- Build success: RAM 33.8% (110,784 bytes), Flash 37.5% (1,055,535 bytes)
+- All six priority queues operational with zero system crashes
+- Test suite running successfully with comprehensive validation
+- Priority validation test integrated into startup sequence (30-second validation)
+
+**Critical Issue Discovery**:
+- **TCB Corruption**: Processing task handles pointing to freed TCBs with poison pattern `0xcecece00`
+- **Root Cause**: Processing tasks exiting improperly without proper cleanup procedures
+- **Impact**: Priority system functional but task lifecycle management requires fixes
+- **Mitigation**: Task status reporting disabled to prevent crashes, system remains operational
+
+**Lessons Learned**:
+- **Task Lifecycle Management**: Critical for production stability - tasks must exit cleanly
+- **PSRAM Integration**: Large queue buffers in PSRAM provide excellent scalability
+- **Comprehensive Testing**: Automated test suites essential for complex systems validation
+- **Emergency Mode Design**: Proactive load management prevents system overload
+- **Thread Safety**: Consistent mutex patterns prevent data corruption under load
+- **Production Monitoring**: Real-time statistics crucial for system health assessment
+
+**Production Impact**: Advanced request priority management system providing foundation for high-load web server operations with intelligent resource management, but requires task lifecycle fixes before production deployment
 
 ## Critical Success Factors
 

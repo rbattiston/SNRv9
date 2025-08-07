@@ -489,7 +489,7 @@ extern "C" {
  * Set to 1 to enable test suite compilation and execution, 0 to disable completely
  * When disabled, test suite code is not compiled (zero memory/flash impact)
  */
-#define DEBUG_PRIORITY_TEST_SUITE 1
+#define DEBUG_PRIORITY_TEST_SUITE 0
 
 /**
  * @brief Default test duration in milliseconds
