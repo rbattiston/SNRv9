@@ -517,13 +517,336 @@ void process_request_batch(priority_queue_t *queue) {
 
 This implementation will transform the web server from a simple request handler into a sophisticated, production-grade system capable of handling real-time industrial automation requirements while maintaining the reliability and monitoring capabilities already established in SNRv9.
 
+## **Debug Configuration Strategy**
+
+### **Integration with Existing Debug System**
+
+SNRv9 already has a comprehensive centralized debug configuration system in `components/web/include/debug_config.h`. For Step 7's Request Priority Management, we'll extend this existing system to include comprehensive debugging measures.
+
+### **New Debug Flags for Request Priority Management**
+
+**Core Priority System Debug Flags:**
+```c
+/* =============================================================================
+ * REQUEST PRIORITY MANAGEMENT DEBUG CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief Enable/disable request priority management debug output
+ * Set to 1 to enable priority system debugging, 0 to disable
+ */
+#define DEBUG_REQUEST_PRIORITY 1
+
+/**
+ * @brief Enable/disable detailed request classification logging
+ * Set to 1 to log every request classification decision, 0 to disable
+ */
+#define DEBUG_REQUEST_CLASSIFICATION 1
+
+/**
+ * @brief Enable/disable queue management debug output
+ * Set to 1 to enable queue depth and operation logging, 0 to disable
+ */
+#define DEBUG_QUEUE_MANAGEMENT 1
+
+/**
+ * @brief Enable/disable request processing timing
+ * Set to 1 to log processing times for each request, 0 to disable
+ */
+#define DEBUG_REQUEST_TIMING 1
+
+/**
+ * @brief Enable/disable load balancing debug output
+ * Set to 1 to enable load balancing decision logging, 0 to disable
+ */
+#define DEBUG_LOAD_BALANCING 1
+
+/**
+ * @brief Enable/disable PSRAM allocation tracking for priority system
+ * Set to 1 to track PSRAM usage by priority components, 0 to disable
+ */
+#define DEBUG_PRIORITY_PSRAM 1
+
+/**
+ * @brief Enable/disable emergency mode debug output
+ * Set to 1 to log emergency mode transitions, 0 to disable
+ */
+#define DEBUG_EMERGENCY_MODE 1
+```
+
+**Timing and Reporting Configuration:**
+```c
+/**
+ * @brief Priority system statistics report interval in milliseconds
+ * How often to output priority system statistics to serial
+ */
+#define DEBUG_PRIORITY_REPORT_INTERVAL_MS 15000
+
+/**
+ * @brief Queue depth monitoring interval in milliseconds
+ * How often to check and report queue depths
+ */
+#define DEBUG_QUEUE_MONITOR_INTERVAL_MS 5000
+
+/**
+ * @brief Request timing threshold in milliseconds
+ * Log requests that take longer than this threshold
+ */
+#define DEBUG_SLOW_REQUEST_THRESHOLD_MS 1000
+
+/**
+ * @brief Maximum number of timing samples to store
+ * For performance analysis and trending
+ */
+#define DEBUG_TIMING_HISTORY_SIZE 50
+```
+
+**Debug Tags for Priority System:**
+```c
+/**
+ * @brief Debug output tag for request priority manager
+ */
+#define DEBUG_PRIORITY_MANAGER_TAG "REQ_PRIORITY"
+
+/**
+ * @brief Debug output tag for request queues
+ */
+#define DEBUG_QUEUE_TAG "REQ_QUEUE"
+
+/**
+ * @brief Debug output tag for request classification
+ */
+#define DEBUG_CLASSIFICATION_TAG "REQ_CLASS"
+
+/**
+ * @brief Debug output tag for load balancing
+ */
+#define DEBUG_LOAD_BALANCE_TAG "LOAD_BAL"
+
+/**
+ * @brief Debug output tag for emergency operations
+ */
+#define DEBUG_EMERGENCY_TAG "EMERGENCY"
+```
+
+### **Implementation Strategy**
+
+#### **1. Conditional Compilation Patterns**
+
+Following the existing SNRv9 pattern, we'll use conditional compilation throughout the priority management code:
+
+```c
+// Example from request classification
+#if DEBUG_REQUEST_CLASSIFICATION
+    ESP_LOGI(DEBUG_CLASSIFICATION_TAG, "Request %s classified as %s (URI: %s)", 
+             req_id, priority_to_string(priority), req->uri);
+#endif
+
+// Example from queue management
+#if DEBUG_QUEUE_MANAGEMENT
+    ESP_LOGD(DEBUG_QUEUE_TAG, "Queue %s: depth=%d/%d, enqueue_time=%dms", 
+             queue_name, current_depth, max_depth, enqueue_time);
+#endif
+
+// Example from timing measurement
+#if DEBUG_REQUEST_TIMING
+    if (processing_time > DEBUG_SLOW_REQUEST_THRESHOLD_MS) {
+        ESP_LOGW(DEBUG_PRIORITY_MANAGER_TAG, "Slow request: %dms for %s priority", 
+                 processing_time, priority_to_string(priority));
+    }
+#endif
+```
+
+#### **2. Performance-Safe Debug Macros**
+
+Zero performance impact when disabled:
+
+```c
+#if DEBUG_REQUEST_PRIORITY && DEBUG_INCLUDE_TIMESTAMPS
+#define PRIORITY_DEBUG_LOG(tag, format, ...) \
+    ESP_LOGI(tag, "[%lu] " format, esp_timer_get_time()/1000, ##__VA_ARGS__)
+#elif DEBUG_REQUEST_PRIORITY
+#define PRIORITY_DEBUG_LOG(tag, format, ...) \
+    ESP_LOGI(tag, format, ##__VA_ARGS__)
+#else
+#define PRIORITY_DEBUG_LOG(tag, format, ...) do {} while(0)
+#endif
+
+#if DEBUG_QUEUE_MANAGEMENT
+#define QUEUE_DEBUG(format, ...) \
+    ESP_LOGD(DEBUG_QUEUE_TAG, format, ##__VA_ARGS__)
+#else
+#define QUEUE_DEBUG(format, ...) do {} while(0)
+#endif
+
+#if DEBUG_LOAD_BALANCING
+#define LOAD_BALANCE_DEBUG(format, ...) \
+    ESP_LOGD(DEBUG_LOAD_BALANCE_TAG, format, ##__VA_ARGS__)
+#else
+#define LOAD_BALANCE_DEBUG(format, ...) do {} while(0)
+#endif
+```
+
+#### **3. Statistics Collection Control**
+
+Debug statistics only compiled when needed:
+
+```c
+#if DEBUG_REQUEST_TIMING
+typedef struct {
+    uint32_t request_count;
+    uint32_t total_processing_time;
+    uint32_t min_processing_time;
+    uint32_t max_processing_time;
+    uint32_t slow_request_count;
+    uint32_t timeout_count;
+} priority_debug_stats_t;
+
+// Only compile statistics collection when debugging enabled
+static priority_debug_stats_t debug_stats[REQUEST_PRIORITY_MAX];
+
+#define UPDATE_TIMING_STATS(priority, time_ms) \
+    do { \
+        debug_stats[priority].request_count++; \
+        debug_stats[priority].total_processing_time += time_ms; \
+        if (time_ms < debug_stats[priority].min_processing_time || \
+            debug_stats[priority].min_processing_time == 0) { \
+            debug_stats[priority].min_processing_time = time_ms; \
+        } \
+        if (time_ms > debug_stats[priority].max_processing_time) { \
+            debug_stats[priority].max_processing_time = time_ms; \
+        } \
+        if (time_ms > DEBUG_SLOW_REQUEST_THRESHOLD_MS) { \
+            debug_stats[priority].slow_request_count++; \
+        } \
+    } while(0)
+#else
+#define UPDATE_TIMING_STATS(priority, time_ms) do {} while(0)
+#endif
+```
+
+#### **4. Queue Debug Monitoring**
+
+```c
+#if DEBUG_QUEUE_MANAGEMENT
+static void debug_print_queue_status(void) {
+    for (int i = 0; i < REQUEST_PRIORITY_MAX; i++) {
+        priority_queue_t *queue = &priority_queues[i];
+        ESP_LOGD(DEBUG_QUEUE_TAG, "Priority %d: %d/%d requests queued", 
+                 i, queue->count, queue->max_capacity);
+    }
+}
+
+#define QUEUE_STATUS_DEBUG() debug_print_queue_status()
+#else
+#define QUEUE_STATUS_DEBUG() do {} while(0)
+#endif
+```
+
+#### **5. PSRAM Allocation Tracking**
+
+```c
+#if DEBUG_PRIORITY_PSRAM
+static void debug_track_psram_allocation(const char* component, size_t size, void* ptr) {
+    if (psram_is_psram_ptr(ptr)) {
+        ESP_LOGD(DEBUG_PRIORITY_MANAGER_TAG, "PSRAM alloc: %s = %zu bytes at %p", 
+                 component, size, ptr);
+    } else {
+        ESP_LOGD(DEBUG_PRIORITY_MANAGER_TAG, "Internal RAM alloc: %s = %zu bytes at %p", 
+                 component, size, ptr);
+    }
+}
+
+#define TRACK_PSRAM_ALLOC(component, size, ptr) debug_track_psram_allocation(component, size, ptr)
+#else
+#define TRACK_PSRAM_ALLOC(component, size, ptr) do {} while(0)
+#endif
+```
+
+#### **6. Emergency Mode Debug Logging**
+
+```c
+#if DEBUG_EMERGENCY_MODE
+static void debug_log_emergency_transition(bool entering_emergency) {
+    if (entering_emergency) {
+        ESP_LOGW(DEBUG_EMERGENCY_TAG, "ENTERING EMERGENCY MODE - Only critical requests will be processed");
+    } else {
+        ESP_LOGI(DEBUG_EMERGENCY_TAG, "EXITING EMERGENCY MODE - Normal request processing resumed");
+    }
+}
+
+#define EMERGENCY_MODE_DEBUG(entering) debug_log_emergency_transition(entering)
+#else
+#define EMERGENCY_MODE_DEBUG(entering) do {} while(0)
+#endif
+```
+
+### **Production Safety Features**
+
+#### **1. Zero Performance Impact**
+- When debug flags are disabled, no debug code is compiled
+- Macros expand to empty statements with no runtime cost
+- No memory allocation for debug structures when disabled
+
+#### **2. Memory Efficient**
+- Debug data structures only exist when debugging is enabled
+- Configurable history sizes to control memory usage
+- PSRAM allocation for large debug datasets
+
+#### **3. Thread Safe**
+- All debug output uses thread-safe ESP-IDF logging
+- Debug statistics protected by existing mutexes
+- No additional synchronization overhead
+
+#### **4. Configurable Verbosity**
+- Different debug levels for different components
+- Timing thresholds to focus on performance issues
+- Separate flags for different aspects of the system
+
+### **Integration with Existing Debug Infrastructure**
+
+#### **Leverage Existing Patterns:**
+- **Timestamp Support**: Use existing `DEBUG_INCLUDE_TIMESTAMPS` flag
+- **Tag System**: Follow established tag naming conventions (`DEBUG_*_TAG`)
+- **Interval Configuration**: Use similar timing patterns as memory/task monitoring
+- **Component Isolation**: Each component maintains its own debug_config.h copy
+
+#### **Extend Current Capabilities:**
+- **Priority-Specific Monitoring**: Track performance by request priority
+- **Queue Health Monitoring**: Real-time queue depth and performance tracking
+- **Load Balancing Insights**: Visibility into load balancing decisions
+- **Emergency Mode Tracking**: Log critical system state transitions
+
+### **Debug Output Examples**
+
+**Request Classification Debug:**
+```
+[12:34:56.789] REQ_CLASS: Request req_001 classified as IO_CRITICAL (URI: /api/io/points/relay_01/set)
+[12:34:56.790] REQ_QUEUE: Enqueued req_001 to IO_CRITICAL queue (depth: 3/100)
+```
+
+**Performance Timing Debug:**
+```
+[12:34:56.850] REQ_PRIORITY: Slow request: 1250ms for NORMAL priority (URI: /api/logs/download)
+[12:34:56.851] LOAD_BAL: Moving NORMAL requests to background processor due to high load
+```
+
+**PSRAM Allocation Debug:**
+```
+[12:34:56.123] REQ_PRIORITY: PSRAM alloc: priority_queue_normal = 8192 bytes at 0x3F800000
+[12:34:56.124] REQ_PRIORITY: Internal RAM alloc: queue_metadata = 64 bytes at 0x3FFB0000
+```
+
+This comprehensive debug configuration strategy ensures that Step 7's implementation will have full visibility into system behavior during development while maintaining zero overhead in production builds, following the established SNRv9 patterns for industrial-grade reliability.
+
 ## **Next Steps**
 
 1. **Review and Approval**: Validate this implementation plan against project requirements
-2. **Phase 1 Implementation**: Begin with core priority infrastructure
-3. **Incremental Testing**: Test each phase thoroughly before proceeding
-4. **Integration Validation**: Ensure compatibility with existing systems
-5. **Performance Optimization**: Fine-tune for ESP32 hardware constraints
-6. **Documentation Update**: Update memory bank with implementation patterns and decisions
+2. **Phase 1 Implementation**: Begin with core priority infrastructure and debug configuration
+3. **Incremental Testing**: Test each phase thoroughly with comprehensive debug output
+4. **Integration Validation**: Ensure compatibility with existing systems and debug infrastructure
+5. **Performance Optimization**: Fine-tune for ESP32 hardware constraints using debug metrics
+6. **Documentation Update**: Update memory bank with implementation patterns and debug strategies
 
-The request priority management system represents a critical step toward production-ready industrial automation capabilities, ensuring reliable real-time performance under all operating conditions.
+The request priority management system represents a critical step toward production-ready industrial automation capabilities, ensuring reliable real-time performance under all operating conditions with comprehensive debugging support for development and maintenance.
