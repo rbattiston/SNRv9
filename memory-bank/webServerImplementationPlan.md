@@ -283,83 +283,9 @@ This document outlines the step-by-step implementation plan for building a sophi
 
 ---
 
-### Step 9: Event Logging System
-**Component**: EventLogger + LogController
-**Priority**: Medium
-
-**Implementation Details**:
-- System event logging with timestamps
-- Web-based log viewing (`/api/logs/*`)
-- Raw log file serving (performance optimized)
-- Log rotation and management
-- Integration with existing debug system
-
-**Success Criteria**:
-- Events logged with proper timestamps
-- Logs accessible via web interface
-- Raw file serving for large logs
-- Log rotation prevents storage overflow
-
-**Files to Create**:
-- `include/event_logger.h`
-- `src/event_logger.c`
-- `include/log_controller.h`
-- `src/log_controller.c`
-
----
-
-### Step 10: Dashboard Controller
-**Component**: DashboardController
-**Priority**: Medium
-
-**Implementation Details**:
-- Real-time dashboard data API (`/api/dashboard/*`)
-- System status aggregation
-- Performance metrics collection
-- Live data updates (polling-based initially)
-- Client-side data processing for heavy operations
-
-**Success Criteria**:
-- Dashboard shows real-time system data
-- Performance metrics updated live
-- Client-side processing prevents server overload
-- Dashboard responsive and informative
-
-**Files to Create**:
-- `include/dashboard_controller.h`
-- `src/dashboard_controller.c`
-- Dashboard HTML/CSS/JS interface
-
----
-
-### Step 11: User Management
-**Component**: UserController + UserManager
-**Priority**: Low
-
-**Implementation Details**:
-- User account management system
-- Role-based access control (RBAC)
-- User CRUD operations via web interface (`/api/users/*`)
-- Password management and security
-- Account enable/disable functionality
-
-**Success Criteria**:
-- User accounts manageable via web
-- RBAC properly enforced
-- Password security implemented
-- User management interface functional
-
-**Files to Create**:
-- `include/user_manager.h`
-- `src/user_manager.c`
-- `include/user_controller.h`
-- `src/user_controller.c`
-
----
-
-### Step 12: Advanced Irrigation Control
+### Step 9: Advanced Irrigation Control
 **Component**: IrrigationManager + IrrigationController
-**Priority**: Medium (Elevated from previous Step 13)
+**Priority**: High (Elevated to Step 9 - Core Business Value)
 
 **Implementation Details**:
 - **IrrigationManager**: Core irrigation logic and scheduling
@@ -398,6 +324,84 @@ This document outlines the step-by-step implementation plan for building a sophi
 - `include/irrigation_controller.h`
 - `src/irrigation_controller.c`
 - Irrigation dashboard HTML/CSS/JS interface
+
+---
+
+### Step 10: Event Logging System
+**Component**: EventLogger + LogController
+**Priority**: Medium
+
+**Implementation Details**:
+- System event logging with timestamps
+- Web-based log viewing (`/api/logs/*`)
+- Raw log file serving (performance optimized)
+- Log rotation and management
+- Integration with existing debug system
+- **Irrigation Event Focus**: Scheduling events, zone activations, sensor-based decisions
+
+**Success Criteria**:
+- Events logged with proper timestamps
+- Logs accessible via web interface
+- Raw file serving for large logs
+- Log rotation prevents storage overflow
+- Irrigation events comprehensively logged
+
+**Files to Create**:
+- `include/event_logger.h`
+- `src/event_logger.c`
+- `include/log_controller.h`
+- `src/log_controller.c`
+
+---
+
+### Step 11: Dashboard Controller
+**Component**: DashboardController
+**Priority**: Medium
+
+**Implementation Details**:
+- Real-time dashboard data API (`/api/dashboard/*`)
+- System status aggregation
+- Performance metrics collection
+- Live data updates (polling-based initially)
+- Client-side data processing for heavy operations
+- **Irrigation Dashboard**: Real-time irrigation status and scheduling visualization
+
+**Success Criteria**:
+- Dashboard shows real-time system data
+- Performance metrics updated live
+- Client-side processing prevents server overload
+- Dashboard responsive and informative
+- Irrigation status prominently displayed
+
+**Files to Create**:
+- `include/dashboard_controller.h`
+- `src/dashboard_controller.c`
+- Dashboard HTML/CSS/JS interface
+
+---
+
+### Step 12: User Management
+**Component**: UserController + UserManager
+**Priority**: Low
+
+**Implementation Details**:
+- User account management system
+- Role-based access control (RBAC)
+- User CRUD operations via web interface (`/api/users/*`)
+- Password management and security
+- Account enable/disable functionality
+
+**Success Criteria**:
+- User accounts manageable via web
+- RBAC properly enforced
+- Password security implemented
+- User management interface functional
+
+**Files to Create**:
+- `include/user_manager.h`
+- `src/user_manager.c`
+- `include/user_controller.h`
+- `src/user_controller.c`
 
 ## Implementation Principles
 

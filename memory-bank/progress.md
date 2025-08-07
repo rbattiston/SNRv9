@@ -143,10 +143,10 @@
 **Performance & Advanced Features (Steps 7-12)**:
 - **Step 7**: Request Priority Management - Load balancing and timeout prevention
 - **Step 8**: ✅ Storage Foundation - LittleFS integration complete
-- **Step 9**: Event Logging System - Web-based log viewing
-- **Step 10**: Dashboard Controller - Real-time monitoring with client-side processing
-- **Step 11**: User Management - Complete RBAC system
-- **Step 12**: Advanced Irrigation Control - Zone management with sensor feedback
+- **Step 9**: Advanced Irrigation Control - Zone management with sensor feedback (ELEVATED TO STEP 9)
+- **Step 10**: Event Logging System - Web-based log viewing (irrigation event focus)
+- **Step 11**: Dashboard Controller - Real-time monitoring with irrigation dashboard
+- **Step 12**: User Management - Complete RBAC system
 
 ### Phase 3: Irrigation Control Integration
 **Priority**: Medium (after web server foundation)
