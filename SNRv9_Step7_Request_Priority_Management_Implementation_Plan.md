@@ -214,22 +214,255 @@ typedef struct {
 } priority_stats_t;
 ```
 
-## **ESP32-Specific Optimizations**
+## **PSRAM Memory Optimization Strategy**
 
-### **Memory Management:**
-- **PSRAM Integration**: Use PSRAM for request queues and large buffers
-- **Stack Optimization**: Minimal stack usage for queue management
-- **Memory Pools**: Pre-allocated request context structures
+### **Current PSRAM Infrastructure Analysis**
+
+SNRv9 already has a sophisticated PSRAM management system that provides:
+
+- **8MB PSRAM detected** (4MB mapped due to ESP32 virtual address limitations)
+- **Smart allocation strategies** with priority-based memory selection
+- **Task creation framework** with PSRAM stack allocation
+- **Thread-safe operations** with comprehensive statistics tracking
+
+### **PSRAM Integration for Request Priority Management**
+
+#### **1. Request Queue Storage in PSRAM**
+
+**Priority Queues → PSRAM:**
+```c
+// Allocate request queues in PSRAM for maximum capacity
+typedef struct {
+    queued_request_t *requests;     // PSRAM-allocated array
+    uint16_t max_capacity;          // Larger capacity possible with PSRAM
+    uint16_t head, tail, count;     // Metadata in internal RAM
+    SemaphoreHandle_t mutex;        // Critical sync in internal RAM
+} priority_queue_t;
+
+// Initialize with PSRAM allocation
+bool init_priority_queue(priority_queue_t *queue, uint16_t capacity) {
+    // Use ALLOC_LARGE_BUFFER to prefer PSRAM for queue storage
+    queue->requests = psram_smart_malloc(
+        capacity * sizeof(queued_request_t), 
+        ALLOC_LARGE_BUFFER
+    );
+    queue->max_capacity = capacity;
+    return queue->requests != NULL;
+}
+```
+
+**Benefits:**
+- **10x larger queues**: 1000+ requests vs 100 with internal RAM
+- **Reduced memory pressure**: Keep internal RAM for critical operations
+- **Better performance**: More buffering capacity during load spikes
+
+#### **2. Request Processing Tasks with PSRAM Stacks**
+
+**Task Configuration for PSRAM Stacks:**
+```c
+// Critical request processor - internal RAM for speed
+psram_task_config_t critical_task_config = {
+    .task_function = request_processor_critical_task,
+    .task_name = "req_critical",
+    .stack_size = 4096,
+    .priority = 10,
+    .use_psram = false,           // Keep in internal RAM for speed
+    .force_internal = true        // Critical operations need fast access
+};
+
+// Normal request processor - PSRAM stack for capacity
+psram_task_config_t normal_task_config = {
+    .task_function = request_processor_normal_task,
+    .task_name = "req_normal",
+    .stack_size = 8192,           // Larger stack possible with PSRAM
+    .priority = 5,
+    .use_psram = true,            // Use PSRAM for larger stack
+    .force_internal = false
+};
+
+// Background processor - PSRAM for maximum capacity
+psram_task_config_t background_task_config = {
+    .task_function = request_processor_background_task,
+    .task_name = "req_background",
+    .stack_size = 12288,          // Very large stack for complex operations
+    .priority = 2,
+    .use_psram = true,
+    .force_internal = false
+};
+```
+
+#### **3. Request Context and Buffer Management**
+
+**Large Request Buffers → PSRAM:**
+```c
+typedef struct {
+    httpd_req_t *request;           // Internal RAM - fast access
+    request_priority_t priority;    // Internal RAM - metadata
+    uint32_t timestamp;             // Internal RAM - metadata
+    
+    // Large buffers in PSRAM
+    char *request_buffer;           // PSRAM - large HTTP request data
+    char *response_buffer;          // PSRAM - large HTTP response data
+    void *processing_context;       // PSRAM - complex processing data
+} request_context_t;
+
+// Allocate request context with PSRAM buffers
+request_context_t* create_request_context(size_t buffer_size) {
+    request_context_t *ctx = psram_smart_malloc(
+        sizeof(request_context_t), ALLOC_NORMAL
+    );
+    
+    if (ctx) {
+        // Large buffers in PSRAM
+        ctx->request_buffer = psram_smart_malloc(buffer_size, ALLOC_LARGE_BUFFER);
+        ctx->response_buffer = psram_smart_malloc(buffer_size, ALLOC_LARGE_BUFFER);
+        ctx->processing_context = psram_smart_malloc(
+            sizeof(complex_processing_data_t), ALLOC_CACHE
+        );
+    }
+    
+    return ctx;
+}
+```
+
+#### **4. Statistics and Monitoring Data in PSRAM**
+
+**Performance Tracking → PSRAM:**
+```c
+typedef struct {
+    // Metadata in internal RAM for fast access
+    uint32_t current_index;
+    uint32_t total_samples;
+    SemaphoreHandle_t mutex;
+    
+    // Large historical data in PSRAM
+    request_timing_sample_t *timing_history;    // PSRAM array
+    queue_depth_sample_t *queue_history;       // PSRAM array
+    load_metric_sample_t *load_history;        // PSRAM array
+} priority_statistics_t;
+
+// Initialize with PSRAM for historical data
+bool init_priority_statistics(priority_statistics_t *stats) {
+    stats->timing_history = psram_smart_malloc(
+        MAX_HISTORY_SAMPLES * sizeof(request_timing_sample_t),
+        ALLOC_CACHE
+    );
+    // ... allocate other history arrays in PSRAM
+}
+```
+
+### **Memory Allocation Strategy**
+
+#### **Internal RAM (Fast Access):**
+- **Critical Metadata**: Queue pointers, mutexes, task handles
+- **Hot Path Data**: Current request being processed
+- **System Structures**: FreeRTOS primitives, interrupt handlers
+- **Emergency Operations**: Safety shutdowns, critical alarms
+
+#### **PSRAM (Large Capacity):**
+- **Request Queues**: Large arrays of queued requests
+- **Task Stacks**: Processing task stacks (8KB+ each)
+- **Request Buffers**: HTTP request/response data
+- **Historical Data**: Performance metrics, timing samples
+- **Cache Data**: Processed results, lookup tables
+
+### **Performance Optimization Techniques**
+
+#### **1. Hybrid Data Structures:**
+```c
+typedef struct {
+    // Hot data in internal RAM
+    volatile uint32_t head;
+    volatile uint32_t tail;
+    volatile uint32_t count;
+    SemaphoreHandle_t mutex;
+    
+    // Cold data in PSRAM
+    queued_request_t *queue_data;   // Large array in PSRAM
+    uint32_t capacity;
+    statistics_t *stats;            // Historical data in PSRAM
+} hybrid_priority_queue_t;
+```
+
+#### **2. Prefetching Strategy:**
+```c
+// Copy critical request data to internal RAM for processing
+void process_request_optimized(queued_request_t *psram_request) {
+    // Copy to internal RAM for fast processing
+    request_metadata_t local_metadata;
+    memcpy(&local_metadata, &psram_request->metadata, sizeof(local_metadata));
+    
+    // Process using fast internal RAM copy
+    process_request_metadata(&local_metadata);
+    
+    // Write results back to PSRAM
+    memcpy(&psram_request->results, &local_metadata.results, sizeof(results_t));
+}
+```
+
+#### **3. Cache-Friendly Access Patterns:**
+```c
+// Batch operations to minimize PSRAM access overhead
+void process_request_batch(priority_queue_t *queue) {
+    const uint32_t BATCH_SIZE = 8;
+    queued_request_t batch[BATCH_SIZE];
+    
+    // Copy batch from PSRAM to internal RAM
+    uint32_t count = dequeue_batch(queue, batch, BATCH_SIZE);
+    
+    // Process entire batch in internal RAM
+    for (uint32_t i = 0; i < count; i++) {
+        process_request_fast(&batch[i]);
+    }
+    
+    // Write results back to PSRAM if needed
+    update_results_batch(queue, batch, count);
+}
+```
+
+### **Memory Usage Projections**
+
+#### **Without PSRAM (Internal RAM Only):**
+- **Request Queues**: ~20KB (limited capacity)
+- **Task Stacks**: ~16KB (3 tasks × 4KB + overhead)
+- **Buffers**: ~8KB (small request/response buffers)
+- **Total**: ~44KB of precious internal RAM
+
+#### **With PSRAM Optimization:**
+- **Internal RAM**: ~8KB (metadata, mutexes, hot data)
+- **PSRAM**: ~200KB (queues, stacks, buffers, history)
+- **Internal RAM Savings**: ~36KB (82% reduction!)
+
+### **Implementation Benefits**
+
+#### **1. Massive Capacity Increase:**
+- **Queue Capacity**: 100 → 1000+ requests per priority level
+- **Task Stacks**: 4KB → 12KB (3x larger for complex operations)
+- **Request Buffers**: 1KB → 16KB (handle large file uploads)
+
+#### **2. System Reliability:**
+- **Internal RAM Pressure**: Dramatically reduced
+- **Memory Fragmentation**: PSRAM handles large allocations
+- **System Stability**: More headroom for critical operations
+
+#### **3. Performance Characteristics:**
+- **PSRAM Access**: ~40ns (acceptable for queued operations)
+- **Internal RAM**: ~10ns (reserved for hot paths)
+- **Overall**: Optimal balance of speed and capacity
+
+## **ESP32-Specific Optimizations**
 
 ### **FreeRTOS Integration:**
 - **Task Affinity**: Pin critical tasks to specific cores
 - **Priority Inheritance**: Prevent priority inversion
 - **Semaphore Optimization**: Fast semaphores for queue access
+- **PSRAM Task Creation**: Use `psram_create_task()` for optimal stack allocation
 
 ### **Hardware Considerations:**
 - **Dual-Core Utilization**: Distribute processing across cores
 - **Interrupt Handling**: Minimize interrupt latency for IO operations
 - **Cache Optimization**: Optimize data structures for cache efficiency
+- **PSRAM Integration**: Leverage existing PSRAM manager for all large allocations
 
 ## **Success Criteria and Testing**
 
