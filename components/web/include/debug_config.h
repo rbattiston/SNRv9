@@ -159,6 +159,186 @@ extern "C" {
  */
 #define DEBUG_DATA_LOGGING 0
 
+/* =============================================================================
+ * REQUEST PRIORITY MANAGEMENT DEBUG CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief Enable/disable request priority management debug output
+ * Set to 1 to enable priority system debugging, 0 to disable
+ */
+#define DEBUG_REQUEST_PRIORITY 1
+
+/**
+ * @brief Enable/disable detailed request classification logging
+ * Set to 1 to log every request classification decision, 0 to disable
+ */
+#define DEBUG_REQUEST_CLASSIFICATION 1
+
+/**
+ * @brief Enable/disable queue management debug output
+ * Set to 1 to enable queue depth and operation logging, 0 to disable
+ */
+#define DEBUG_QUEUE_MANAGEMENT 1
+
+/**
+ * @brief Enable/disable request processing timing
+ * Set to 1 to log processing times for each request, 0 to disable
+ */
+#define DEBUG_REQUEST_TIMING 1
+
+/**
+ * @brief Enable/disable load balancing debug output
+ * Set to 1 to enable load balancing decision logging, 0 to disable
+ */
+#define DEBUG_LOAD_BALANCING 1
+
+/**
+ * @brief Enable/disable PSRAM allocation tracking for priority system
+ * Set to 1 to track PSRAM usage by priority components, 0 to disable
+ */
+#define DEBUG_PRIORITY_PSRAM 1
+
+/**
+ * @brief Enable/disable emergency mode debug output
+ * Set to 1 to log emergency mode transitions, 0 to disable
+ */
+#define DEBUG_EMERGENCY_MODE 1
+
+/**
+ * @brief Priority system statistics report interval in milliseconds
+ * How often to output priority system statistics to serial
+ */
+#define DEBUG_PRIORITY_REPORT_INTERVAL_MS 15000
+
+/**
+ * @brief Queue depth monitoring interval in milliseconds
+ * How often to check and report queue depths
+ */
+#define DEBUG_QUEUE_MONITOR_INTERVAL_MS 5000
+
+/**
+ * @brief Request timing threshold in milliseconds
+ * Log requests that take longer than this threshold
+ */
+#define DEBUG_SLOW_REQUEST_THRESHOLD_MS 1000
+
+/**
+ * @brief Maximum number of timing samples to store
+ * For performance analysis and trending
+ */
+#define DEBUG_TIMING_HISTORY_SIZE 50
+
+/**
+ * @brief Debug output tag for request priority manager
+ */
+#define DEBUG_PRIORITY_MANAGER_TAG "REQ_PRIORITY"
+
+/**
+ * @brief Debug output tag for request queues
+ */
+#define DEBUG_QUEUE_TAG "REQ_QUEUE"
+
+/**
+ * @brief Debug output tag for request classification
+ */
+#define DEBUG_CLASSIFICATION_TAG "REQ_CLASS"
+
+/**
+ * @brief Debug output tag for load balancing
+ */
+#define DEBUG_LOAD_BALANCE_TAG "LOAD_BAL"
+
+/**
+ * @brief Debug output tag for emergency operations
+ */
+#define DEBUG_EMERGENCY_TAG "EMERGENCY"
+
+/* =============================================================================
+ * REQUEST PRIORITY TEST SUITE DEBUG CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief Enable/disable request priority test suite
+ * Set to 1 to enable test suite compilation and execution, 0 to disable completely
+ * When disabled, test suite code is not compiled (zero memory/flash impact)
+ */
+#define DEBUG_PRIORITY_TEST_SUITE 1
+
+/**
+ * @brief Default test duration in milliseconds
+ * How long each test scenario runs by default
+ */
+#define DEBUG_PRIORITY_TEST_DURATION_MS 60000
+
+/**
+ * @brief Test status report interval in milliseconds
+ * How often to output test progress and statistics
+ */
+#define DEBUG_PRIORITY_TEST_REPORT_INTERVAL_MS 5000
+
+/**
+ * @brief Enable/disable detailed test task logging
+ * Set to 1 to log individual test task operations, 0 for summary only
+ */
+#define DEBUG_PRIORITY_TEST_DETAILED 1
+
+/**
+ * @brief Enable/disable test scenario transition logging
+ * Set to 1 to log when test scenarios start/stop, 0 to disable
+ */
+#define DEBUG_PRIORITY_TEST_SCENARIOS 1
+
+/**
+ * @brief Enable/disable test statistics collection
+ * Set to 1 to collect detailed timing and performance statistics, 0 to disable
+ */
+#define DEBUG_PRIORITY_TEST_STATISTICS 1
+
+/**
+ * @brief Enable/disable test memory tracking
+ * Set to 1 to track memory usage during tests, 0 to disable
+ */
+#define DEBUG_PRIORITY_TEST_MEMORY 1
+
+/**
+ * @brief Test load generator default rate (requests per second)
+ * Default rate for load generation testing
+ */
+#define DEBUG_PRIORITY_TEST_LOAD_RATE_RPS 10
+
+/**
+ * @brief Test load generator default payload size in bytes
+ * Default size for generated test requests
+ */
+#define DEBUG_PRIORITY_TEST_PAYLOAD_SIZE 2048
+
+/**
+ * @brief Emergency mode test timeout in milliseconds
+ * How long to stay in emergency mode during testing
+ */
+#define DEBUG_PRIORITY_TEST_EMERGENCY_TIMEOUT_MS 30000
+
+/**
+ * @brief Enable/disable automatic test cleanup
+ * Set to 1 to automatically cleanup test resources on completion, 0 for manual cleanup
+ */
+#define DEBUG_PRIORITY_TEST_AUTO_CLEANUP 1
+
+/**
+ * @brief Maximum test duration in milliseconds (safety limit)
+ * Tests will be automatically stopped after this duration
+ */
+#define DEBUG_PRIORITY_TEST_MAX_DURATION_MS 300000
+
+/**
+ * @brief Debug output tag for priority test suite
+ */
+#define DEBUG_PRIORITY_TEST_TAG "PRIORITY_TEST"
+
+
 #ifdef __cplusplus
 }
 #endif

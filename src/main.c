@@ -27,6 +27,9 @@
 #include "io_manager.h"
 #include "io_test_controller.h"
 #include "debug_config.h"
+#include "request_priority_manager.h"
+#include "request_queue.h"
+#include "request_priority_test_suite.h"
 
 static const char *TAG = "SNRv9_MAIN";
 
@@ -297,6 +300,45 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to initialize IO test controller");
         return;
     }
+
+#if DEBUG_REQUEST_PRIORITY
+    // Initialize Request Priority Management System
+    ESP_LOGI(TAG, "Initializing request priority management system...");
+    
+    // Create default configurations
+    queue_manager_config_t queue_config = {0};
+    priority_manager_config_t priority_config = {0};
+    
+    // Get default priority manager configuration (includes queue config)
+    request_priority_get_default_config(&priority_config);
+    
+    // Extract queue configuration from priority config
+    queue_config = priority_config.queue_config;
+    
+    // Initialize request queue system
+    if (!request_queue_init(&queue_config)) {
+        ESP_LOGE(TAG, "Failed to initialize request queue system");
+        return;
+    }
+    
+    // Initialize request priority manager
+    if (!request_priority_manager_init(&priority_config)) {
+        ESP_LOGE(TAG, "Failed to initialize request priority manager");
+        return;
+    }
+
+#if DEBUG_PRIORITY_TEST_SUITE
+    // Initialize priority test suite (conditionally)
+    ESP_LOGI(TAG, "Initializing request priority test suite...");
+    if (!priority_test_suite_init(NULL)) {
+        ESP_LOGW(TAG, "Failed to initialize priority test suite (non-critical)");
+    } else {
+        ESP_LOGI(TAG, "Priority test suite initialized successfully");
+    }
+#endif // DEBUG_PRIORITY_TEST_SUITE
+
+    ESP_LOGI(TAG, "Request priority management system initialized successfully");
+#endif // DEBUG_REQUEST_PRIORITY
     
     // Register task lifecycle callbacks
     task_tracker_register_creation_callback(on_task_created);
@@ -385,6 +427,23 @@ void app_main(void)
                 web_server_manager_print_status();
                 auth_manager_print_status();
             }
+
+#if DEBUG_REQUEST_PRIORITY
+            // Request priority system health check
+            if (request_priority_health_check()) {
+                request_priority_print_status_report();
+                request_queue_print_statistics();
+            } else {
+                ESP_LOGW(TAG, "Request priority system health check failed!");
+            }
+
+#if DEBUG_PRIORITY_TEST_SUITE
+            // Priority test suite status (if running)
+            if (priority_test_suite_is_running()) {
+                priority_test_suite_print_status();
+            }
+#endif // DEBUG_PRIORITY_TEST_SUITE
+#endif // DEBUG_REQUEST_PRIORITY
             
             // Check for potential memory leaks
             if (memory_monitor_check_for_leaks()) {
