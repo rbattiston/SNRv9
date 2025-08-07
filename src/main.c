@@ -182,6 +182,85 @@ static void on_task_deleted(const task_info_t *task)
     ESP_LOGI(TAG, "Task deleted: %s", task->name);
 }
 
+#if DEBUG_PRIORITY_TEST_SUITE
+/**
+ * @brief Run a simple priority validation test
+ * 
+ * This function tests the basic functionality of the priority system by:
+ * 1. Running a short test scenario to verify priority ordering
+ * 2. Checking that all processing tasks are working
+ * 3. Validating queue operations
+ */
+static void run_priority_validation_test(void) {
+    ESP_LOGI(TAG, "=== STARTING PRIORITY VALIDATION TEST ===");
+    
+    // Check if test suite is available
+    if (!priority_test_suite_health_check()) {
+        ESP_LOGW(TAG, "Priority test suite health check failed - skipping test");
+        return;
+    }
+    
+    // Run a short normal operation test (30 seconds)
+    ESP_LOGI(TAG, "Running 30-second priority validation test...");
+    esp_err_t result = priority_test_suite_run_scenario(TEST_SCENARIO_NORMAL_OPERATION, 30000);
+    
+    if (result == ESP_OK) {
+        ESP_LOGI(TAG, "Priority validation test started successfully");
+        
+        // Wait for test to complete
+        uint32_t wait_time = 0;
+        while (priority_test_suite_is_running() && wait_time < 35000) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            wait_time += 1000;
+            
+            // Print progress every 10 seconds
+            if (wait_time % 10000 == 0) {
+                ESP_LOGI(TAG, "Priority test progress: %lu/30 seconds", wait_time / 1000);
+                priority_test_suite_print_status();
+            }
+        }
+        
+        // Get final results
+        test_result_summary_t summary;
+        if (priority_test_suite_get_summary(&summary)) {
+            ESP_LOGI(TAG, "=== PRIORITY VALIDATION TEST RESULTS ===");
+            ESP_LOGI(TAG, "Test Completed: %s", summary.test_completed_successfully ? "SUCCESS" : "FAILED");
+            ESP_LOGI(TAG, "Total Requests: Generated=%lu, Processed=%lu, Dropped=%lu", 
+                     summary.total_requests_generated, summary.total_requests_processed, 
+                     summary.total_requests_dropped);
+            ESP_LOGI(TAG, "Average Processing Time: %.2f ms", summary.average_processing_time_ms);
+            
+            if (summary.total_requests_generated > 0) {
+                float success_rate = (float)summary.total_requests_processed / summary.total_requests_generated * 100.0f;
+                ESP_LOGI(TAG, "Success Rate: %.1f%%", success_rate);
+                
+                if (success_rate >= 95.0f && summary.test_completed_successfully) {
+                    ESP_LOGI(TAG, "🎉 PRIORITY SYSTEM VALIDATION: PASS");
+                } else {
+                    ESP_LOGW(TAG, "⚠️  PRIORITY SYSTEM VALIDATION: MARGINAL (low success rate)");
+                }
+            } else {
+                ESP_LOGW(TAG, "⚠️  PRIORITY SYSTEM VALIDATION: NO REQUESTS PROCESSED");
+            }
+            
+            if (summary.failure_reason) {
+                ESP_LOGW(TAG, "Failure Reason: %s", summary.failure_reason);
+            }
+        } else {
+            ESP_LOGE(TAG, "Failed to get test summary");
+        }
+        
+        // Print detailed statistics
+        priority_test_suite_print_statistics();
+        
+    } else {
+        ESP_LOGE(TAG, "Failed to start priority validation test: %s", esp_err_to_name(result));
+    }
+    
+    ESP_LOGI(TAG, "=== PRIORITY VALIDATION TEST COMPLETE ===");
+}
+#endif // DEBUG_PRIORITY_TEST_SUITE
+
 
 void app_main(void)
 {
@@ -396,6 +475,7 @@ void app_main(void)
     
     // Wait for WiFi connection before starting web server
     bool web_server_started = false;
+    bool priority_test_completed = false;
     ESP_LOGI(TAG, "System ready for irrigation control implementation");
     
     // Main application loop
@@ -413,6 +493,15 @@ void app_main(void)
                 ESP_LOGE(TAG, "Failed to start web server");
             }
         }
+        
+#if DEBUG_PRIORITY_TEST_SUITE
+        // Run priority validation test once after web server starts
+        if (web_server_started && !priority_test_completed && loop_counter > 50) {
+            // Wait a bit for system to stabilize after web server start
+            run_priority_validation_test();
+            priority_test_completed = true;
+        }
+#endif // DEBUG_PRIORITY_TEST_SUITE
         
         // Detailed system reports every 60 seconds
         if (loop_counter % 600 == 0) {
