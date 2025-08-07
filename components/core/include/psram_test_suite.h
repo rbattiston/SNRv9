@@ -80,6 +80,17 @@ bool psram_test_memory_pressure(void);
 bool psram_run_comprehensive_test_suite(void);
 
 /**
+ * @brief Run comprehensive PSRAM test suite with task yielding
+ * 
+ * Executes all PSRAM tests in sequence with strategic task yields and
+ * watchdog resets to prevent system timeouts during intensive testing
+ * with comprehensive heap debugging enabled.
+ * 
+ * @return true if all tests pass, false if any test fails
+ */
+bool psram_run_comprehensive_test_suite_with_yields(void);
+
+/**
  * @brief Quick PSRAM functionality test
  * 
  * Performs a quick validation of basic PSRAM functionality including

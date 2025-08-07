@@ -427,8 +427,16 @@ bool psram_is_psram_ptr(void* ptr)
         return false;
     }
 
-    return heap_caps_check_integrity(MALLOC_CAP_SPIRAM, true) && 
-           heap_caps_get_allocated_size(ptr) > 0;
+    // Check if the pointer is in PSRAM address range
+    // PSRAM typically starts at 0x3F800000 on ESP32
+    uintptr_t addr = (uintptr_t)ptr;
+    
+    // ESP32 PSRAM address range: 0x3F800000 - 0x3FFFFFFF
+    if (addr >= 0x3F800000 && addr < 0x40000000) {
+        return true;
+    }
+    
+    return false;
 }
 
 size_t psram_get_free_size(void)

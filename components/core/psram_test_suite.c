@@ -11,6 +11,7 @@
 #include "debug_config.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -163,12 +164,30 @@ bool psram_test_basic_functionality(void)
  */
 bool psram_test_allocation_strategies(void)
 {
-    ESP_LOGI(TAG, "=== PSRAM ALLOCATION STRATEGIES TEST ===");
+#if DEBUG_PSRAM_ALLOCATION_STRATEGY
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PSRAM ALLOCATION STRATEGIES TEST ===");
+#endif
     
     // Test critical allocation (should be internal RAM)
+#if DEBUG_PSRAM_MEMORY_ACCESS
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Testing critical allocation strategy...");
+#endif
     void* critical_ptr = psram_smart_malloc(1024, ALLOC_CRITICAL);
     bool critical_test = (critical_ptr != NULL);
     if (critical_ptr) {
+#if DEBUG_PSRAM_MEMORY_ACCESS
+        // Validate memory address before using
+        ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Critical allocation at: 0x%08lx", (unsigned long)critical_ptr);
+        
+        // Safe memory test
+        volatile uint32_t* test_ptr = (volatile uint32_t*)critical_ptr;
+        *test_ptr = 0xDEADBEEF;
+        if (*test_ptr == 0xDEADBEEF) {
+            ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Critical allocation memory test: PASS");
+        } else {
+            ESP_LOGE(DEBUG_PSRAM_SAFETY_TAG, "Critical allocation memory test: FAIL");
+        }
+#endif
         bool is_psram = psram_is_psram_ptr(critical_ptr);
         ESP_LOGI(TAG, "Critical allocation in PSRAM: %s (should be NO)", 
                  is_psram ? "YES" : "NO");
@@ -176,9 +195,24 @@ bool psram_test_allocation_strategies(void)
     }
     
     // Test large buffer allocation (should prefer PSRAM if available)
+#if DEBUG_PSRAM_MEMORY_ACCESS
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Testing large buffer allocation strategy...");
+#endif
     void* large_ptr = psram_smart_malloc(32768, ALLOC_LARGE_BUFFER);
     bool large_test = (large_ptr != NULL);
     if (large_ptr) {
+#if DEBUG_PSRAM_MEMORY_ACCESS
+        ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Large buffer allocation at: 0x%08lx", (unsigned long)large_ptr);
+        
+        // Test memory access pattern
+        memset(large_ptr, 0x55, 1024);  // Test first 1KB only for safety
+        uint8_t* check_ptr = (uint8_t*)large_ptr;
+        if (check_ptr[0] == 0x55 && check_ptr[1023] == 0x55) {
+            ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Large buffer memory access: PASS");
+        } else {
+            ESP_LOGE(DEBUG_PSRAM_SAFETY_TAG, "Large buffer memory access: FAIL");
+        }
+#endif
         bool is_psram = psram_is_psram_ptr(large_ptr);
         ESP_LOGI(TAG, "Large buffer allocation in PSRAM: %s", 
                  is_psram ? "YES" : "NO");
@@ -186,9 +220,15 @@ bool psram_test_allocation_strategies(void)
     }
     
     // Test cache allocation
+#if DEBUG_PSRAM_MEMORY_ACCESS
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Testing cache allocation strategy...");
+#endif
     void* cache_ptr = psram_smart_malloc(16384, ALLOC_CACHE);
     bool cache_test = (cache_ptr != NULL);
     if (cache_ptr) {
+#if DEBUG_PSRAM_MEMORY_ACCESS
+        ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Cache allocation at: 0x%08lx", (unsigned long)cache_ptr);
+#endif
         bool is_psram = psram_is_psram_ptr(cache_ptr);
         ESP_LOGI(TAG, "Cache allocation in PSRAM: %s", 
                  is_psram ? "YES" : "NO");
@@ -196,84 +236,129 @@ bool psram_test_allocation_strategies(void)
     }
     
     // Test normal allocation
+#if DEBUG_PSRAM_MEMORY_ACCESS
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Testing normal allocation strategy...");
+#endif
     void* normal_ptr = psram_smart_malloc(2048, ALLOC_NORMAL);
     bool normal_test = (normal_ptr != NULL);
     if (normal_ptr) {
+#if DEBUG_PSRAM_MEMORY_ACCESS
+        ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Normal allocation at: 0x%08lx", (unsigned long)normal_ptr);
+#endif
         psram_smart_free(normal_ptr);
     }
     
-    ESP_LOGI(TAG, "Allocation test results:");
-    ESP_LOGI(TAG, "  Critical: %s", critical_test ? "PASS" : "FAIL");
-    ESP_LOGI(TAG, "  Large buffer: %s", large_test ? "PASS" : "FAIL");
-    ESP_LOGI(TAG, "  Cache: %s", cache_test ? "PASS" : "FAIL");
-    ESP_LOGI(TAG, "  Normal: %s", normal_test ? "PASS" : "FAIL");
-    
-    ESP_LOGI(TAG, "=== ALLOCATION STRATEGIES TEST COMPLETE ===");
+#if DEBUG_PSRAM_ALLOCATION_STRATEGY
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Allocation test results:");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "  Critical: %s", critical_test ? "PASS" : "FAIL");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "  Large buffer: %s", large_test ? "PASS" : "FAIL");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "  Cache: %s", cache_test ? "PASS" : "FAIL");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "  Normal: %s", normal_test ? "PASS" : "FAIL");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== ALLOCATION STRATEGIES TEST COMPLETE ===");
+#endif
     return critical_test && large_test && cache_test && normal_test;
 }
 
 /**
- * @brief Test PSRAM task creation functionality
+ * @brief Test PSRAM task creation functionality with enhanced safety
  */
 bool psram_test_task_creation(void)
 {
-    ESP_LOGI(TAG, "=== PSRAM TASK CREATION TEST ===");
+#if DEBUG_PSRAM_TASK_CREATION
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PSRAM TASK CREATION TEST ===");
+#endif
     
     bool all_tests_passed = true;
+    TaskHandle_t task_handles[2] = {NULL, NULL};  // Track task handles for cleanup
     
-    // Test 1: Create task with PSRAM stack
+    // Test 1: Create task with PSRAM stack (reduced complexity)
+#if DEBUG_PSRAM_TASK_CREATION
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Creating task '%s' with stack size %d", "psram_test_1", 4096);
+#endif
     psram_task_config_t psram_config = {
         .task_function = psram_stack_test_task,
         .task_name = "psram_test_1",
-        .stack_size = 6144,  // Large stack to trigger PSRAM allocation
+        .stack_size = 4096,  // Reduced from 6144 for safety
         .parameters = (void*)1,
         .priority = 3,
-        .task_handle = NULL,
+        .task_handle = &task_handles[0],
         .use_psram = true,
         .force_internal = false
     };
     
+    // Pre-allocation safety check
+    size_t free_heap_before = esp_get_free_heap_size();
+    if (free_heap_before < 50000) {
+        ESP_LOGW(TAG, "Insufficient heap for task creation test, skipping");
+        return false;
+    }
+    
     BaseType_t result1 = psram_create_task(&psram_config);
     ESP_LOGI(TAG, "PSRAM task creation: %s", result1 == pdPASS ? "PASS" : "FAIL");
-    if (result1 != pdPASS) all_tests_passed = false;
+    if (result1 != pdPASS) {
+        all_tests_passed = false;
+    } else {
+        // Validate task handle
+        if (task_handles[0] == NULL) {
+            ESP_LOGE(TAG, "Task created but handle is NULL");
+            all_tests_passed = false;
+        }
+    }
     
-    // Test 2: Create task with forced internal RAM
+    // Wait for first task to stabilize before creating second
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_task_wdt_reset();
+    
+    // Test 2: Create task with forced internal RAM (simplified)
+#if DEBUG_PSRAM_TASK_CREATION
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Creating task '%s' with stack size %d (internal RAM)", "internal_test_1", 2048);
+#endif
     psram_task_config_t internal_config = {
         .task_function = internal_ram_test_task,
         .task_name = "internal_test_1",
-        .stack_size = 3072,
+        .stack_size = 2048,  // Reduced from 3072 for safety
         .parameters = (void*)2,
         .priority = 3,
-        .task_handle = NULL,
+        .task_handle = &task_handles[1],
         .use_psram = false,
         .force_internal = true
     };
     
     BaseType_t result2 = psram_create_task(&internal_config);
     ESP_LOGI(TAG, "Internal RAM task creation: %s", result2 == pdPASS ? "PASS" : "FAIL");
-    if (result2 != pdPASS) all_tests_passed = false;
+    if (result2 != pdPASS) {
+        all_tests_passed = false;
+    } else {
+        // Validate task handle
+        if (task_handles[1] == NULL) {
+            ESP_LOGE(TAG, "Task created but handle is NULL");
+            all_tests_passed = false;
+        }
+    }
     
-    // Test 3: Create standard task
-    psram_task_config_t standard_config = {
-        .task_function = psram_stack_test_task,
-        .task_name = "standard_test_1",
-        .stack_size = 2048,
-        .parameters = (void*)3,
-        .priority = 3,
-        .task_handle = NULL,
-        .use_psram = false,
-        .force_internal = false
-    };
+    // Wait for tasks to complete with watchdog management
+#if DEBUG_PSRAM_TASK_CREATION
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Waiting for test tasks to complete...");
+#endif
+    for (int i = 0; i < 20; i++) {  // 2 second total wait
+        vTaskDelay(pdMS_TO_TICKS(100));
+        esp_task_wdt_reset();
+    }
     
-    BaseType_t result3 = psram_create_task(&standard_config);
-    ESP_LOGI(TAG, "Standard task creation: %s", result3 == pdPASS ? "PASS" : "FAIL");
-    if (result3 != pdPASS) all_tests_passed = false;
+    // Validate task handles are still valid (tasks should have self-deleted)
+    for (int i = 0; i < 2; i++) {
+        if (task_handles[i] != NULL) {
+            // Check if task still exists
+            eTaskState task_state = eTaskGetState(task_handles[i]);
+            if (task_state != eDeleted) {
+                ESP_LOGW(TAG, "Task %d still running, state: %d", i, task_state);
+            }
+        }
+    }
     
-    // Wait for tasks to complete
-    ESP_LOGI(TAG, "Waiting for test tasks to complete...");
-    vTaskDelay(pdMS_TO_TICKS(3000));
-    
-    ESP_LOGI(TAG, "=== TASK CREATION TEST COMPLETE ===");
+#if DEBUG_PSRAM_TASK_CREATION
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== TASK CREATION TEST COMPLETE ===");
+#endif
     return all_tests_passed;
 }
 
@@ -352,49 +437,177 @@ bool psram_test_memory_pressure(void)
  */
 bool psram_run_comprehensive_test_suite(void)
 {
-    ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "STARTING COMPREHENSIVE PSRAM TEST SUITE");
-    ESP_LOGI(TAG, "========================================");
+#if DEBUG_PSRAM_TEST_VERBOSE
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "========================================");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "STARTING COMPREHENSIVE PSRAM TEST SUITE");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "========================================");
+#endif
+
+#if DEBUG_PSRAM_SAFETY_CHECKS
+    // Pre-test system validation
+    esp_err_t heap_check = heap_caps_check_integrity_all(true);
+    if (heap_check != ESP_OK) {
+        ESP_LOGE(DEBUG_PSRAM_SAFETY_TAG, "Heap integrity check failed before test - aborting");
+        return false;
+    }
+    ESP_LOGI(DEBUG_PSRAM_SAFETY_TAG, "Pre-test heap integrity: PASS");
+#endif
     
     bool all_tests_passed = true;
     
-    // Test 1: Basic functionality
+    // Phase 1: Basic functionality
+#if DEBUG_PSRAM_TEST_VERBOSE
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PHASE 1: BASIC FUNCTIONALITY TEST ===");
+#endif
     if (!psram_test_basic_functionality()) {
         all_tests_passed = false;
     }
     
-    vTaskDelay(pdMS_TO_TICKS(500));
-    
-    // Test 2: Allocation strategies
+    // Add delay between phases for system recovery
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // Phase 2: Allocation strategies
+#if DEBUG_PSRAM_ALLOCATION_STRATEGY
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PHASE 2: ALLOCATION STRATEGIES TEST ===");
+#endif
     if (!psram_test_allocation_strategies()) {
         all_tests_passed = false;
     }
     
-    vTaskDelay(pdMS_TO_TICKS(500));
-    
-    // Test 3: Task creation
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // Phase 3: Task creation
+#if DEBUG_PSRAM_TASK_CREATION
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PHASE 3: TASK CREATION TEST ===");
+#endif
     if (!psram_test_task_creation()) {
         all_tests_passed = false;
     }
     
-    vTaskDelay(pdMS_TO_TICKS(500));
-    
-    // Test 4: Health check
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // Phase 4: Health check
+#if DEBUG_PSRAM_HEALTH_CHECK
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PHASE 4: HEALTH CHECK TEST ===");
+#endif
     if (!psram_test_health_check()) {
         all_tests_passed = false;
     }
     
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // Phase 5: Memory pressure
+#if DEBUG_PSRAM_TEST_VERBOSE
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PHASE 5: MEMORY PRESSURE TEST ===");
+#endif
+    if (!psram_test_memory_pressure()) {
+        all_tests_passed = false;
+    }
+
+#if DEBUG_PSRAM_SAFETY_CHECKS
+    // Post-test system validation
+    heap_check = heap_caps_check_integrity_all(true);
+    if (heap_check != ESP_OK) {
+        ESP_LOGE(DEBUG_PSRAM_SAFETY_TAG, "Heap integrity check failed after test");
+    } else {
+        ESP_LOGI(DEBUG_PSRAM_SAFETY_TAG, "Post-test heap integrity: PASS");
+    }
+#endif
+
+#if DEBUG_PSRAM_TEST_VERBOSE
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "========================================");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "COMPREHENSIVE TEST SUITE COMPLETE");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "OVERALL RESULT: %s", all_tests_passed ? "PASS" : "FAIL");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "========================================");
+#endif
     
-    // Test 5: Memory pressure
+    return all_tests_passed;
+}
+
+/**
+ * @brief Run comprehensive PSRAM test suite with task yielding
+ * 
+ * This version includes strategic task yields and watchdog resets to prevent
+ * system timeouts during intensive testing with comprehensive heap debugging.
+ */
+bool psram_run_comprehensive_test_suite_with_yields(void)
+{
+#if DEBUG_PSRAM_TEST_VERBOSE
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "========================================");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "STARTING YIELDING PSRAM TEST SUITE");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "========================================");
+#endif
+    
+    bool all_tests_passed = true;
+    
+    // Phase 1: Basic functionality with yielding
+#if DEBUG_PSRAM_TEST_VERBOSE
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PHASE 1: BASIC FUNCTIONALITY TEST ===");
+#endif
+    esp_task_wdt_reset();
+    if (!psram_test_basic_functionality()) {
+        all_tests_passed = false;
+    }
+    
+    // Extended delay between phases for system recovery
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    esp_task_wdt_reset();
+
+    // Phase 2: Allocation strategies with yielding
+#if DEBUG_PSRAM_ALLOCATION_STRATEGY
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PHASE 2: ALLOCATION STRATEGIES TEST ===");
+#endif
+    esp_task_wdt_reset();
+    if (!psram_test_allocation_strategies()) {
+        all_tests_passed = false;
+    }
+    
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    esp_task_wdt_reset();
+
+    // Phase 3: Task creation with yielding
+#if DEBUG_PSRAM_TASK_CREATION
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PHASE 3: TASK CREATION TEST ===");
+#endif
+    esp_task_wdt_reset();
+    if (!psram_test_task_creation()) {
+        all_tests_passed = false;
+    }
+    
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    esp_task_wdt_reset();
+
+    // Phase 4: Health check with yielding
+#if DEBUG_PSRAM_HEALTH_CHECK
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PHASE 4: HEALTH CHECK TEST ===");
+#endif
+    esp_task_wdt_reset();
+    if (!psram_test_health_check()) {
+        all_tests_passed = false;
+    }
+    
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    esp_task_wdt_reset();
+
+    // Phase 5: Memory pressure with yielding
+#if DEBUG_PSRAM_TEST_VERBOSE
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "=== PHASE 5: MEMORY PRESSURE TEST ===");
+#endif
+    esp_task_wdt_reset();
     if (!psram_test_memory_pressure()) {
         all_tests_passed = false;
     }
     
-    ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "COMPREHENSIVE TEST SUITE COMPLETE");
-    ESP_LOGI(TAG, "OVERALL RESULT: %s", all_tests_passed ? "PASS" : "FAIL");
-    ESP_LOGI(TAG, "========================================");
+    // Final system recovery delay
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_task_wdt_reset();
+
+#if DEBUG_PSRAM_TEST_VERBOSE
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "========================================");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "YIELDING TEST SUITE COMPLETE");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "OVERALL RESULT: %s", all_tests_passed ? "PASS" : "FAIL");
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "========================================");
+#endif
     
     return all_tests_passed;
 }

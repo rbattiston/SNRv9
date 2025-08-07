@@ -303,6 +303,85 @@ extern "C" {
  */
 #define DEBUG_IO_TEST_MANAGER_TAG "IO_TEST"
 
+/* =============================================================================
+ * PSRAM TESTING DEBUG CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief Enable/disable PSRAM comprehensive testing
+ * Set to 1 to enable full test suite, 0 to disable completely
+ */
+#define DEBUG_PSRAM_COMPREHENSIVE_TESTING 1
+
+/**
+ * @brief Enable/disable PSRAM quick testing
+ * Set to 1 to enable quick test, 0 to disable
+ */
+#define DEBUG_PSRAM_QUICK_TESTING 1
+
+/**
+ * @brief PSRAM test execution delay in milliseconds
+ * How long to wait after startup before running comprehensive tests
+ */
+#define DEBUG_PSRAM_TEST_DELAY_MS 60000
+
+/**
+ * @brief Enable/disable verbose PSRAM test output
+ * Set to 1 for detailed test phase output, 0 for summary only
+ */
+#define DEBUG_PSRAM_TEST_VERBOSE 1
+
+/**
+ * @brief Enable/disable PSRAM allocation strategy debugging
+ * Set to 1 to debug allocation strategy tests, 0 to disable
+ */
+#define DEBUG_PSRAM_ALLOCATION_STRATEGY 1
+
+/**
+ * @brief Enable/disable PSRAM task creation debugging
+ * Set to 1 to debug task creation tests, 0 to disable
+ */
+#define DEBUG_PSRAM_TASK_CREATION 1
+
+/**
+ * @brief Enable/disable PSRAM memory access debugging
+ * Set to 1 to debug memory access patterns, 0 to disable
+ */
+#define DEBUG_PSRAM_MEMORY_ACCESS 1
+
+/**
+ * @brief Enable/disable PSRAM health check debugging
+ * Set to 1 to debug health check operations, 0 to disable
+ */
+#define DEBUG_PSRAM_HEALTH_CHECK 1
+
+/**
+ * @brief Enable/disable PSRAM safety checks
+ * Set to 1 to enable runtime safety validation, 0 to disable
+ */
+#define DEBUG_PSRAM_SAFETY_CHECKS 1
+
+/* =============================================================================
+ * PSRAM TESTING OUTPUT TAGS
+ * =============================================================================
+ */
+
+/**
+ * @brief Debug output tag for PSRAM testing
+ */
+#define DEBUG_PSRAM_TEST_TAG "PSRAM_TEST"
+
+/**
+ * @brief Debug output tag for PSRAM manager
+ */
+#define DEBUG_PSRAM_MGR_TAG "PSRAM_MGR"
+
+/**
+ * @brief Debug output tag for PSRAM safety
+ */
+#define DEBUG_PSRAM_SAFETY_TAG "PSRAM_SAFETY"
+
 #ifdef __cplusplus
 }
 #endif

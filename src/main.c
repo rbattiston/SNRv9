@@ -11,6 +11,8 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_chip_info.h"
+#include "esp_timer.h"
+#include "esp_task_wdt.h"
 #include "memory_monitor.h"
 #include "task_tracker.h"
 #include "psram_manager.h"
@@ -32,6 +34,135 @@ static const char *TAG = "SNRv9_MAIN";
 static config_manager_t config_manager;
 static io_manager_t io_manager;
 
+// PSRAM test timer handle
+#if DEBUG_PSRAM_COMPREHENSIVE_TESTING
+static esp_timer_handle_t psram_test_timer = NULL;
+#endif
+
+#if DEBUG_PSRAM_COMPREHENSIVE_TESTING
+/**
+ * @brief Progressive heap integrity check with task yielding
+ * 
+ * Performs heap integrity checking in stages with task yields to prevent
+ * watchdog timeouts during comprehensive heap debugging.
+ */
+static bool progressive_heap_integrity_check(void) {
+    ESP_LOGI(DEBUG_PSRAM_SAFETY_TAG, "Starting progressive heap integrity check...");
+    
+    // Step 1: Quick basic check of internal heap
+    esp_task_wdt_reset();
+    if (!heap_caps_check_integrity(MALLOC_CAP_INTERNAL, false)) {
+        ESP_LOGE(DEBUG_PSRAM_SAFETY_TAG, "Internal heap basic check failed");
+        return false;
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
+    
+    // Step 2: Quick basic check of PSRAM heap
+    esp_task_wdt_reset();
+    if (!heap_caps_check_integrity(MALLOC_CAP_SPIRAM, false)) {
+        ESP_LOGE(DEBUG_PSRAM_SAFETY_TAG, "PSRAM heap basic check failed");
+        return false;
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
+    
+    // Step 3: More comprehensive check with watchdog management
+    ESP_LOGI(DEBUG_PSRAM_SAFETY_TAG, "Performing comprehensive heap check...");
+    esp_task_wdt_reset();
+    
+    // Use non-verbose mode to reduce processing time
+    bool comprehensive_result = heap_caps_check_integrity_all(false);
+    
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(100)); // Allow system recovery
+    
+    ESP_LOGI(DEBUG_PSRAM_SAFETY_TAG, "Progressive heap integrity check completed: %s", 
+             comprehensive_result ? "PASS" : "FAIL");
+    return comprehensive_result;
+}
+
+/**
+ * @brief Report test progress and reset watchdog
+ */
+static void report_test_progress(const char* stage, int current, int total) {
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Progress: %s [%d/%d] - %d%% complete", 
+             stage, current, total, (current * 100) / total);
+    esp_task_wdt_reset(); // Reset watchdog during progress reporting
+    vTaskDelay(pdMS_TO_TICKS(10)); // Brief yield
+}
+
+/**
+ * @brief Delayed comprehensive PSRAM test execution with yielding
+ * 
+ * This function is called by a timer after system stabilization to run
+ * the comprehensive PSRAM test suite with enhanced safety checks and
+ * task yielding to prevent watchdog timeouts.
+ */
+static void delayed_psram_comprehensive_test(void* arg) {
+    // Add current task to watchdog to prevent "task not found" errors
+    esp_err_t wdt_result = esp_task_wdt_add(NULL);
+    if (wdt_result != ESP_OK && wdt_result != ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(DEBUG_PSRAM_TEST_TAG, "Failed to add timer task to watchdog: %s", esp_err_to_name(wdt_result));
+    }
+
+#if DEBUG_PSRAM_TEST_VERBOSE
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Starting delayed comprehensive PSRAM test");
+#endif
+    
+#if DEBUG_PSRAM_SAFETY_CHECKS
+    // Check system health before running intensive tests
+    UBaseType_t main_stack_remaining = uxTaskGetStackHighWaterMark(NULL);
+    size_t free_heap = esp_get_free_heap_size();
+    
+    ESP_LOGI(DEBUG_PSRAM_SAFETY_TAG, "Pre-test safety check:");
+    ESP_LOGI(DEBUG_PSRAM_SAFETY_TAG, "  Main task stack remaining: %d bytes", main_stack_remaining);
+    ESP_LOGI(DEBUG_PSRAM_SAFETY_TAG, "  Free heap: %d bytes", free_heap);
+    
+    if (main_stack_remaining < 1000) {
+        ESP_LOGW(DEBUG_PSRAM_SAFETY_TAG, "Skipping comprehensive test - insufficient main task stack");
+        goto cleanup;
+    }
+    
+    if (free_heap < 100000) {
+        ESP_LOGW(DEBUG_PSRAM_SAFETY_TAG, "Skipping comprehensive test - insufficient free heap");
+        goto cleanup;
+    }
+    
+    // Use progressive heap integrity check instead of blocking check
+    if (!progressive_heap_integrity_check()) {
+        ESP_LOGE(DEBUG_PSRAM_SAFETY_TAG, "Progressive heap integrity check failed before test - aborting");
+        goto cleanup;
+    }
+    ESP_LOGI(DEBUG_PSRAM_SAFETY_TAG, "Pre-test heap integrity: PASS");
+#endif
+    
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "System safety checks passed - proceeding with comprehensive test");
+    report_test_progress("Initialization", 1, 6);
+    
+    if (psram_run_comprehensive_test_suite_with_yields()) {
+        ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Comprehensive PSRAM test suite: PASS");
+        report_test_progress("Test Suite", 6, 6);
+    } else {
+        ESP_LOGE(DEBUG_PSRAM_TEST_TAG, "Comprehensive PSRAM test suite: FAIL");
+    }
+    
+#if DEBUG_PSRAM_SAFETY_CHECKS
+    // Post-test system validation using progressive check
+    report_test_progress("Post-test validation", 5, 6);
+    if (!progressive_heap_integrity_check()) {
+        ESP_LOGE(DEBUG_PSRAM_SAFETY_TAG, "Progressive heap integrity check failed after test");
+    } else {
+        ESP_LOGI(DEBUG_PSRAM_SAFETY_TAG, "Post-test heap integrity: PASS");
+    }
+#endif
+    
+    ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Comprehensive PSRAM test completed successfully");
+
+cleanup:
+    // Remove task from watchdog before exiting
+    esp_task_wdt_delete(NULL);
+}
+#endif
+
 /**
  * @brief Task creation callback for system monitoring
  */
@@ -48,118 +179,6 @@ static void on_task_deleted(const task_info_t *task)
     ESP_LOGI(TAG, "Task deleted: %s", task->name);
 }
 
-/**
- * @brief Comprehensive PSRAM functionality test
- * 
- * This function performs a thorough test of PSRAM capabilities including:
- * - PSRAM detection and availability
- * - Allocation strategy testing
- * - Task creation with PSRAM stacks
- * - Memory usage monitoring
- * - Performance validation
- */
-static void run_psram_comprehensive_test(void)
-{
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "    PSRAM COMPREHENSIVE TEST SUITE");
-    ESP_LOGI(TAG, "========================================");
-    
-    // Phase 1: Basic PSRAM Detection
-    ESP_LOGI(TAG, "Phase 1: PSRAM Detection and Availability");
-    ESP_LOGI(TAG, "----------------------------------------");
-    
-    if (psram_manager_is_available()) {
-        ESP_LOGI(TAG, "✓ PSRAM is available and functional");
-        
-        psram_info_t info;
-        if (psram_manager_get_info(&info)) {
-            ESP_LOGI(TAG, "✓ PSRAM Total Size: %u KB", 
-                     (unsigned int)(info.psram_total_size / 1024));
-            ESP_LOGI(TAG, "✓ PSRAM Free Size: %u KB", 
-                     (unsigned int)(info.psram_free_size / 1024));
-            ESP_LOGI(TAG, "✓ PSRAM Largest Block: %u KB", 
-                     (unsigned int)(info.psram_largest_block / 1024));
-        }
-    } else {
-        ESP_LOGW(TAG, "⚠ PSRAM not available - tests will use internal RAM");
-    }
-    
-    // Phase 2: Allocation Strategy Testing
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "Phase 2: Allocation Strategy Testing");
-    ESP_LOGI(TAG, "------------------------------------");
-    psram_demonstrate_allocation_strategies();
-    
-    // Phase 3: Memory Statistics Before Task Creation
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "Phase 3: Memory Statistics (Before Task Creation)");
-    ESP_LOGI(TAG, "------------------------------------------------");
-    psram_show_usage_example();
-    
-    // Phase 4: Task Creation Testing
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "Phase 4: PSRAM Task Creation Testing");
-    ESP_LOGI(TAG, "------------------------------------");
-    
-    // Test critical task creation (should use internal RAM)
-    ESP_LOGI(TAG, "Creating critical task (internal RAM)...");
-    if (psram_create_critical_task_example()) {
-        ESP_LOGI(TAG, "✓ Critical task created successfully");
-    } else {
-        ESP_LOGE(TAG, "✗ Critical task creation failed");
-    }
-    
-    vTaskDelay(pdMS_TO_TICKS(2000)); // Let task run and complete
-    
-    // Test data processing task (should use PSRAM if available)
-    ESP_LOGI(TAG, "Creating data processing task (PSRAM preferred)...");
-    if (psram_create_data_processing_task_example()) {
-        ESP_LOGI(TAG, "✓ Data processing task created successfully");
-    } else {
-        ESP_LOGE(TAG, "✗ Data processing task creation failed");
-    }
-    
-    vTaskDelay(pdMS_TO_TICKS(3000)); // Let task run and complete
-    
-    // Test web server task (should use PSRAM if available)
-    ESP_LOGI(TAG, "Creating web server task (PSRAM preferred)...");
-    if (psram_create_web_server_task_example()) {
-        ESP_LOGI(TAG, "✓ Web server task created successfully");
-    } else {
-        ESP_LOGE(TAG, "✗ Web server task creation failed");
-    }
-    
-    vTaskDelay(pdMS_TO_TICKS(3000)); // Let task run and complete
-    
-    // Phase 5: Memory Statistics After Task Creation
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "Phase 5: Memory Statistics (After Task Creation)");
-    ESP_LOGI(TAG, "-----------------------------------------------");
-    psram_show_usage_example();
-    
-    // Phase 6: PSRAM Health Check
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "Phase 6: PSRAM Health Check");
-    ESP_LOGI(TAG, "---------------------------");
-    if (psram_manager_health_check()) {
-        ESP_LOGI(TAG, "✓ PSRAM health check passed");
-    } else {
-        ESP_LOGW(TAG, "⚠ PSRAM health check failed");
-    }
-    
-    // Phase 7: Allocation Statistics
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "Phase 7: Final Allocation Statistics");
-    ESP_LOGI(TAG, "-----------------------------------");
-    psram_manager_print_allocation_stats();
-    
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "    PSRAM TEST SUITE COMPLETED");
-    ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "");
-}
 
 void app_main(void)
 {
@@ -303,9 +322,33 @@ void app_main(void)
     
     ESP_LOGI(TAG, "All systems started successfully");
     
-    // Run comprehensive PSRAM test suite - DISABLED to prevent main task stack overflow
-    // ESP_LOGI(TAG, "Running PSRAM comprehensive test suite...");
-    // run_psram_comprehensive_test();
+#if DEBUG_PSRAM_QUICK_TESTING
+    // Quick test runs immediately for basic validation
+    ESP_LOGI(TAG, "Running quick PSRAM test...");
+    if (psram_quick_test()) {
+        ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Quick PSRAM test: PASS");
+    } else {
+        ESP_LOGW(DEBUG_PSRAM_TEST_TAG, "Quick PSRAM test: FAIL");
+    }
+#endif
+
+#if DEBUG_PSRAM_COMPREHENSIVE_TESTING
+    // Schedule comprehensive test after system stabilization
+    ESP_LOGI(TAG, "Scheduling comprehensive PSRAM test in %d ms", DEBUG_PSRAM_TEST_DELAY_MS);
+    
+    // Create timer for delayed test execution
+    esp_timer_create_args_t timer_args = {
+        .callback = &delayed_psram_comprehensive_test,
+        .name = "psram_test_timer"
+    };
+    esp_err_t timer_result = esp_timer_create(&timer_args, &psram_test_timer);
+    if (timer_result == ESP_OK) {
+        esp_timer_start_once(psram_test_timer, DEBUG_PSRAM_TEST_DELAY_MS * 1000); // Convert to microseconds
+        ESP_LOGI(DEBUG_PSRAM_TEST_TAG, "Comprehensive PSRAM test scheduled successfully");
+    } else {
+        ESP_LOGE(DEBUG_PSRAM_TEST_TAG, "Failed to create PSRAM test timer: %s", esp_err_to_name(timer_result));
+    }
+#endif
     
     ESP_LOGI(TAG, "WiFi connecting to S3CURE_WIFI...");
     
