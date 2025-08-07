@@ -7,6 +7,7 @@
 #include "auth_controller.h"
 #include "system_controller.h"
 #include "io_test_controller.h"
+#include "task_tracker.h"
 #include "debug_config.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -128,7 +129,7 @@ bool web_server_manager_start(void)
     config.max_uri_handlers = g_web_server.config.max_uri_handlers;
     config.max_open_sockets = g_web_server.config.max_open_sockets;
     config.task_priority = g_web_server.config.task_priority;
-    config.stack_size = 6144; // Increased stack size for large file operations
+    config.stack_size = 8192; // Increased stack size for large file operations
     
     ESP_LOGI(TAG, "HTTP server config: main_stack=%lu", 
              (unsigned long)config.stack_size);
@@ -194,6 +195,15 @@ bool web_server_manager_start(void)
     }
 
     g_web_server.status = WEB_SERVER_RUNNING;
+
+    // Register the actual stack size with the task tracker for accurate monitoring
+    if (task_tracker_register_stack_size("httpd", config.stack_size)) {
+        ESP_LOGI(TAG, "Registered httpd task stack size: %lu bytes", (unsigned long)config.stack_size);
+        // Force task tracker to update and pick up the newly registered stack size
+        task_tracker_update();
+    } else {
+        ESP_LOGW(TAG, "Failed to register httpd task stack size with task tracker");
+    }
 
     ESP_LOGI(TAG, "Web server started successfully with static file support");
 

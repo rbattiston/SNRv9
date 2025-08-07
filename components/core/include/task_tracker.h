@@ -269,6 +269,64 @@ void task_tracker_register_creation_callback(void (*callback)(const task_info_t 
  */
 void task_tracker_register_deletion_callback(void (*callback)(const task_info_t *task));
 
+/* =============================================================================
+ * STACK SIZE REGISTRATION FUNCTIONS
+ * =============================================================================
+ */
+
+/**
+ * @brief Register a task's actual stack size with the tracker
+ * 
+ * Allows components to register the actual stack size of tasks they create,
+ * enabling accurate stack usage calculations and monitoring.
+ * 
+ * @param task_name Name of the task (must match FreeRTOS task name)
+ * @param stack_size Actual stack size in bytes allocated for the task
+ * @return true if registration successful, false otherwise
+ */
+bool task_tracker_register_stack_size(const char *task_name, uint32_t stack_size);
+
+/**
+ * @brief Update stack size for an existing registered task
+ * 
+ * Updates the registered stack size for a task. Useful when tasks are
+ * recreated with different stack sizes.
+ * 
+ * @param task_name Name of the task to update
+ * @param stack_size New stack size in bytes
+ * @return true if update successful, false if task not found
+ */
+bool task_tracker_update_stack_size(const char *task_name, uint32_t stack_size);
+
+/**
+ * @brief Get registered stack size for a task
+ * 
+ * Retrieves the registered stack size for a task, if available.
+ * 
+ * @param task_name Name of the task to query
+ * @return Registered stack size in bytes, or 0 if not registered
+ */
+uint32_t task_tracker_get_registered_stack_size(const char *task_name);
+
+/**
+ * @brief Unregister a task's stack size
+ * 
+ * Removes a task from the registered stack sizes table. The task will
+ * fall back to estimated stack size calculations.
+ * 
+ * @param task_name Name of the task to unregister
+ * @return true if unregistration successful, false if task not found
+ */
+bool task_tracker_unregister_stack_size(const char *task_name);
+
+/**
+ * @brief Check if a task has a registered stack size
+ * 
+ * @param task_name Name of the task to check
+ * @return true if task has registered stack size, false otherwise
+ */
+bool task_tracker_has_registered_stack_size(const char *task_name);
+
 #ifdef __cplusplus
 }
 #endif

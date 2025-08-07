@@ -47,6 +47,15 @@
  * =============================================================================
  */
 
+/**
+ * @brief Registered stack size entry
+ */
+typedef struct {
+    char task_name[configMAX_TASK_NAME_LEN];
+    uint32_t stack_size;
+    bool is_valid;
+} registered_stack_size_t;
+
 typedef struct {
     task_tracker_status_t status;
     TaskHandle_t tracker_task_handle;
@@ -58,6 +67,7 @@ typedef struct {
     uint32_t last_update_time;
     void (*creation_callback)(const task_info_t *task);
     void (*deletion_callback)(const task_info_t *task);
+    registered_stack_size_t registered_stacks[DEBUG_MAX_TASKS_TRACKED];
 } task_tracker_context_t;
 
 /* =============================================================================
@@ -82,6 +92,7 @@ static void calculate_task_stats(void);
 static int find_task_by_handle(TaskHandle_t handle);
 static int find_empty_slot(void);
 static uint32_t estimate_task_stack_size(const char *task_name);
+static uint32_t get_registered_stack_size_unsafe(const char *task_name);
 
 /* =============================================================================
  * PUBLIC FUNCTION IMPLEMENTATIONS
@@ -513,6 +524,141 @@ void task_tracker_register_deletion_callback(void (*callback)(const task_info_t 
 }
 
 /* =============================================================================
+ * STACK SIZE REGISTRATION FUNCTION IMPLEMENTATIONS
+ * =============================================================================
+ */
+
+bool task_tracker_register_stack_size(const char *task_name, uint32_t stack_size)
+{
+    if (task_name == NULL || stack_size == 0) {
+        ESP_LOGE(TAG, "Invalid parameters for stack size registration");
+        return false;
+    }
+
+    if (xSemaphoreTake(g_task_tracker.data_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // Check if task is already registered
+        for (int i = 0; i < DEBUG_MAX_TASKS_TRACKED; i++) {
+            if (g_task_tracker.registered_stacks[i].is_valid &&
+                strcmp(g_task_tracker.registered_stacks[i].task_name, task_name) == 0) {
+                // Update existing registration
+                g_task_tracker.registered_stacks[i].stack_size = stack_size;
+                xSemaphoreGive(g_task_tracker.data_mutex);
+                ESP_LOGI(TAG, "Updated registered stack size for task '%s': %u bytes", task_name, (unsigned int)stack_size);
+                return true;
+            }
+        }
+
+        // Find empty slot for new registration
+        for (int i = 0; i < DEBUG_MAX_TASKS_TRACKED; i++) {
+            if (!g_task_tracker.registered_stacks[i].is_valid) {
+                strncpy(g_task_tracker.registered_stacks[i].task_name, task_name, configMAX_TASK_NAME_LEN - 1);
+                g_task_tracker.registered_stacks[i].task_name[configMAX_TASK_NAME_LEN - 1] = '\0';
+                g_task_tracker.registered_stacks[i].stack_size = stack_size;
+                g_task_tracker.registered_stacks[i].is_valid = true;
+                xSemaphoreGive(g_task_tracker.data_mutex);
+                ESP_LOGI(TAG, "Registered stack size for task '%s': %u bytes", task_name, (unsigned int)stack_size);
+                return true;
+            }
+        }
+
+        xSemaphoreGive(g_task_tracker.data_mutex);
+        ESP_LOGW(TAG, "No free slots for stack size registration");
+        return false;
+    }
+
+    ESP_LOGE(TAG, "Failed to acquire mutex for stack size registration");
+    return false;
+}
+
+bool task_tracker_update_stack_size(const char *task_name, uint32_t stack_size)
+{
+    if (task_name == NULL || stack_size == 0) {
+        return false;
+    }
+
+    if (xSemaphoreTake(g_task_tracker.data_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        for (int i = 0; i < DEBUG_MAX_TASKS_TRACKED; i++) {
+            if (g_task_tracker.registered_stacks[i].is_valid &&
+                strcmp(g_task_tracker.registered_stacks[i].task_name, task_name) == 0) {
+                g_task_tracker.registered_stacks[i].stack_size = stack_size;
+                xSemaphoreGive(g_task_tracker.data_mutex);
+                ESP_LOGI(TAG, "Updated stack size for task '%s': %u bytes", task_name, (unsigned int)stack_size);
+                return true;
+            }
+        }
+        xSemaphoreGive(g_task_tracker.data_mutex);
+    }
+
+    return false;
+}
+
+uint32_t task_tracker_get_registered_stack_size(const char *task_name)
+{
+    if (task_name == NULL) {
+        return 0;
+    }
+
+    uint32_t stack_size = 0;
+
+    if (xSemaphoreTake(g_task_tracker.data_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        for (int i = 0; i < DEBUG_MAX_TASKS_TRACKED; i++) {
+            if (g_task_tracker.registered_stacks[i].is_valid &&
+                strcmp(g_task_tracker.registered_stacks[i].task_name, task_name) == 0) {
+                stack_size = g_task_tracker.registered_stacks[i].stack_size;
+                break;
+            }
+        }
+        xSemaphoreGive(g_task_tracker.data_mutex);
+    }
+
+    return stack_size;
+}
+
+bool task_tracker_unregister_stack_size(const char *task_name)
+{
+    if (task_name == NULL) {
+        return false;
+    }
+
+    if (xSemaphoreTake(g_task_tracker.data_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        for (int i = 0; i < DEBUG_MAX_TASKS_TRACKED; i++) {
+            if (g_task_tracker.registered_stacks[i].is_valid &&
+                strcmp(g_task_tracker.registered_stacks[i].task_name, task_name) == 0) {
+                memset(&g_task_tracker.registered_stacks[i], 0, sizeof(registered_stack_size_t));
+                xSemaphoreGive(g_task_tracker.data_mutex);
+                ESP_LOGI(TAG, "Unregistered stack size for task '%s'", task_name);
+                return true;
+            }
+        }
+        xSemaphoreGive(g_task_tracker.data_mutex);
+    }
+
+    return false;
+}
+
+bool task_tracker_has_registered_stack_size(const char *task_name)
+{
+    if (task_name == NULL) {
+        return false;
+    }
+
+    bool found = false;
+
+    if (xSemaphoreTake(g_task_tracker.data_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        for (int i = 0; i < DEBUG_MAX_TASKS_TRACKED; i++) {
+            if (g_task_tracker.registered_stacks[i].is_valid &&
+                strcmp(g_task_tracker.registered_stacks[i].task_name, task_name) == 0) {
+                found = true;
+                break;
+            }
+        }
+        xSemaphoreGive(g_task_tracker.data_mutex);
+    }
+
+    return found;
+}
+
+/* =============================================================================
  * PRIVATE FUNCTION IMPLEMENTATIONS
  * =============================================================================
  */
@@ -736,10 +882,34 @@ static int find_empty_slot(void)
     return -1;
 }
 
+static uint32_t get_registered_stack_size_unsafe(const char *task_name)
+{
+    if (task_name == NULL) {
+        return 0;
+    }
+
+    // This function assumes the mutex is already held by the caller
+    for (int i = 0; i < DEBUG_MAX_TASKS_TRACKED; i++) {
+        if (g_task_tracker.registered_stacks[i].is_valid &&
+            strcmp(g_task_tracker.registered_stacks[i].task_name, task_name) == 0) {
+            return g_task_tracker.registered_stacks[i].stack_size;
+        }
+    }
+
+    return 0;
+}
+
 static uint32_t estimate_task_stack_size(const char *task_name)
 {
     if (task_name == NULL) {
         return DEFAULT_STACK_SIZE;
+    }
+
+    // First check if we have a registered stack size for this task
+    // Use the unsafe version since we're already holding the mutex in update_task_list()
+    uint32_t registered_size = get_registered_stack_size_unsafe(task_name);
+    if (registered_size > 0) {
+        return registered_size;
     }
 
     // Use configuration-based stack sizes where available
