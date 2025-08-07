@@ -142,17 +142,24 @@ bool request_priority_manager_init(const priority_manager_config_t *config) {
     memset(debug_stats, 0, sizeof(debug_stats));
 #endif
     
-    // Initialize processing tasks
+    // CRITICAL FIX: Set initialized flag BEFORE creating tasks to prevent race condition
+    is_initialized = true;
+    monitoring_enabled = config->enable_statistics;
+    current_system_mode = SYSTEM_MODE_NORMAL;
+    
+    ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "RACE_CONDITION_FIX: Set is_initialized=true BEFORE task creation");
+    
+    // Initialize processing tasks (now that is_initialized is true)
     if (!init_processing_tasks()) {
         ESP_LOGE(DEBUG_PRIORITY_MANAGER_TAG, "Failed to initialize processing tasks");
+        // Reset initialization state on failure
+        is_initialized = false;
+        monitoring_enabled = false;
+        current_system_mode = SYSTEM_MODE_NORMAL;
         request_queue_cleanup();
         vSemaphoreDelete(system_mutex);
         return false;
     }
-    
-    is_initialized = true;
-    monitoring_enabled = config->enable_statistics;
-    current_system_mode = SYSTEM_MODE_NORMAL;
     
     PRIORITY_DEBUG_LOG(DEBUG_PRIORITY_MANAGER_TAG, "Request priority manager initialized successfully");
     return true;
@@ -282,17 +289,27 @@ esp_err_t request_priority_queue_request(httpd_req_t *req, request_priority_t pr
 
 void request_priority_process_queues(processing_task_type_t task_type) {
     if (!is_initialized || task_type >= TASK_TYPE_MAX) {
+        ESP_LOGE(DEBUG_PRIORITY_MANAGER_TAG, "LOOP_DEBUG: Invalid parameters - is_initialized=%d, task_type=%d", 
+                 is_initialized, task_type);
         return;
     }
     
     processing_task_config_t *config = &task_configs[task_type];
     uint32_t last_health_check = 0;
     uint32_t last_stats_update = 0;
+    uint32_t loop_iteration = 0;
     
-    PRIORITY_DEBUG_LOG(DEBUG_PRIORITY_MANAGER_TAG, "Starting %s processing task", 
-                      task_type_names[task_type]);
+    ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "LOOP_DEBUG: Starting %s processing task", 
+             task_type_names[task_type]);
+    ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "LOOP_DEBUG: About to enter while(true) loop");
     
     while (true) {
+        loop_iteration++;
+        
+        if (loop_iteration <= 5 || (loop_iteration % 100) == 0) {
+            ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "LOOP_DEBUG: %s task iteration %lu", 
+                     task_type_names[task_type], loop_iteration);
+        }
         uint32_t current_time = get_current_time_ms();
         
         // Periodic health checks
