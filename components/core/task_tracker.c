@@ -749,9 +749,9 @@ static void update_task_list(void)
         } else {
             // High water mark is larger than estimated stack size - use a conservative estimate
             task->stack_used = task->stack_size * 80 / 100; // Assume 80% usage
-            ESP_LOGW(TAG, "Task '%s': High water mark (%u) > estimated stack (%u), using conservative estimate",
-                     task->name, (unsigned int)task->stack_high_water_mark, (unsigned int)task->stack_size);
-        }
+            /* ESP_LOGW(TAG, "Task '%s': High water mark (%u) > estimated stack (%u), using conservative estimate",
+                      task->name, (unsigned int)task->stack_high_water_mark, (unsigned int)task->stack_size);
+        */}
         task->creation_time = GET_TIMESTAMP();
         task->is_valid = true;
 

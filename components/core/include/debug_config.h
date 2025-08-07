@@ -392,7 +392,7 @@ extern "C" {
  * @brief Enable/disable request priority management debug output
  * Set to 1 to enable priority system debugging, 0 to disable
  */
-#define DEBUG_REQUEST_PRIORITY 1
+#define DEBUG_REQUEST_PRIORITY 0 //Turned it off
 
 /**
  * @brief Enable/disable detailed request classification logging

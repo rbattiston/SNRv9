@@ -714,25 +714,67 @@ void request_priority_print_status_report(void) {
     // Print queue status
     request_queue_print_status_report();
     
-    // Print task status - TEMPORARILY DISABLED due to TCB corruption
+    // Print task status using task tracker's proven method
     ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "=== PROCESSING TASKS ===");
-    ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "CRITICAL: Task status reporting temporarily disabled due to TCB corruption");
-    ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "ISSUE: Task handles point to freed TCBs with poison pattern 0xcecece00");
     
-    for (int i = 0; i < TASK_TYPE_MAX; i++) {
-        ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "%s Task: Handle=%p (status check DISABLED to prevent crash)", 
-                 task_type_names[i], processing_tasks[i]);
+    // Use uxTaskGetSystemState() like task tracker for safe task access
+    UBaseType_t num_tasks = uxTaskGetNumberOfTasks();
+    TaskStatus_t *task_status_array = pvPortMalloc(num_tasks * sizeof(TaskStatus_t));
+    
+    if (task_status_array != NULL) {
+        UBaseType_t actual_tasks = uxTaskGetSystemState(task_status_array, num_tasks, NULL);
         
-        // Only log handle presence/absence - DO NOT ACCESS TCB
-        if (processing_tasks[i]) {
-            ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "%s Task: Handle exists but TCB may be corrupted", 
-                     task_type_names[i]);
-        } else {
-            ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "%s Task: Handle is NULL", task_type_names[i]);
+        // Find our processing tasks in the system state
+        for (int i = 0; i < TASK_TYPE_MAX; i++) {
+            bool task_found = false;
+            
+            // Search for our task by name in the system state
+            for (UBaseType_t j = 0; j < actual_tasks; j++) {
+                if (strcmp(task_status_array[j].pcTaskName, task_configs[i].task_name) == 0) {
+                    TaskStatus_t *status = &task_status_array[j];
+                    
+                    const char *state_str = "Unknown";
+                    switch (status->eCurrentState) {
+                        case eRunning:   state_str = "Running"; break;
+                        case eReady:     state_str = "Ready"; break;
+                        case eBlocked:   state_str = "Blocked"; break;
+                        case eSuspended: state_str = "Suspended"; break;
+                        case eDeleted:   state_str = "Deleted"; break;
+                        default:         state_str = "Invalid"; break;
+                    }
+                    
+                    uint32_t stack_high_water = status->usStackHighWaterMark * sizeof(StackType_t);
+                    uint32_t stack_used = task_configs[i].stack_size - stack_high_water;
+                    uint8_t stack_usage_pct = (stack_used * 100) / task_configs[i].stack_size;
+                    
+                    ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, 
+                             "%s Task: Handle=%p State=%s Priority=%u Stack=%u/%u(%u%%) Runtime=%lu", 
+                             task_type_names[i], status->xHandle, state_str, 
+                             (unsigned int)status->uxCurrentPriority,
+                             (unsigned int)stack_used, (unsigned int)task_configs[i].stack_size, 
+                             stack_usage_pct, status->ulRunTimeCounter);
+                    
+                    task_found = true;
+                    break;
+                }
+            }
+            
+            if (!task_found) {
+                ESP_LOGW(DEBUG_PRIORITY_MANAGER_TAG, "%s Task: Not found in system state (may have exited)", 
+                         task_type_names[i]);
+            }
+        }
+        
+        vPortFree(task_status_array);
+    } else {
+        ESP_LOGE(DEBUG_PRIORITY_MANAGER_TAG, "Failed to allocate memory for task status array");
+        
+        // Fallback: just show handle presence without accessing TCB
+        for (int i = 0; i < TASK_TYPE_MAX; i++) {
+            ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "%s Task: Handle=%p (memory allocation failed for detailed status)", 
+                     task_type_names[i], processing_tasks[i]);
         }
     }
-    
-    ESP_LOGI(DEBUG_PRIORITY_MANAGER_TAG, "NEXT STEP: Fix task exit issue to prevent TCB corruption");
 }
 
 void request_priority_print_statistics(void) {
@@ -827,21 +869,46 @@ bool request_priority_health_check(void) {
         healthy = false;
     }
     
-    // Check processing tasks
-    for (int i = 0; i < TASK_TYPE_MAX; i++) {
-        if (processing_tasks[i]) {
-            eTaskState task_state = eTaskGetState(processing_tasks[i]);
-            if (task_state == eDeleted || task_state == eInvalid) {
-                ESP_LOGE(DEBUG_PRIORITY_MANAGER_TAG, "%s task is not running", 
+    // Check processing tasks using safe system state method
+    UBaseType_t num_tasks = uxTaskGetNumberOfTasks();
+    TaskStatus_t *task_status_array = pvPortMalloc(num_tasks * sizeof(TaskStatus_t));
+    
+    if (task_status_array != NULL) {
+        UBaseType_t actual_tasks = uxTaskGetSystemState(task_status_array, num_tasks, NULL);
+        
+        // Check each of our processing tasks
+        for (int i = 0; i < TASK_TYPE_MAX; i++) {
+            bool task_found = false;
+            
+            // Search for our task by name in the system state
+            for (UBaseType_t j = 0; j < actual_tasks; j++) {
+                if (strcmp(task_status_array[j].pcTaskName, task_configs[i].task_name) == 0) {
+                    TaskStatus_t *status = &task_status_array[j];
+                    
+                    if (status->eCurrentState == eDeleted || status->eCurrentState == eInvalid) {
+                        ESP_LOGE(DEBUG_PRIORITY_MANAGER_TAG, "%s task is not running (state: %d)", 
+                                 task_type_names[i], status->eCurrentState);
+                        processing_tasks[i] = NULL; // Clear invalid handle
+                        healthy = false;
+                    }
+                    
+                    task_found = true;
+                    break;
+                }
+            }
+            
+            if (!task_found) {
+                ESP_LOGW(DEBUG_PRIORITY_MANAGER_TAG, "%s task not found in system state", 
                          task_type_names[i]);
-                processing_tasks[i] = NULL; // Clear invalid handle
+                processing_tasks[i] = NULL; // Clear handle for missing task
                 healthy = false;
             }
-        } else {
-            ESP_LOGW(DEBUG_PRIORITY_MANAGER_TAG, "%s task handle is NULL", 
-                     task_type_names[i]);
-            healthy = false;
         }
+        
+        vPortFree(task_status_array);
+    } else {
+        ESP_LOGE(DEBUG_PRIORITY_MANAGER_TAG, "Failed to allocate memory for health check");
+        healthy = false;
     }
     
     // Check system mutex
