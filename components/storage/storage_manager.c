@@ -1,6 +1,7 @@
 #include "storage_manager.h"
 #include "esp_littlefs.h"
 #include "esp_log.h"
+#include "nvs_flash.h"
 #include <dirent.h>
 #include <sys/stat.h>
 #include <string.h>
@@ -9,6 +10,24 @@ static const char *TAG = "storage_manager";
 
 esp_err_t storage_manager_init(void)
 {
+    esp_err_t ret;
+    
+    // Initialize NVS first (required for time manager and other components)
+    ESP_LOGI(TAG, "Initializing NVS flash...");
+    ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // NVS partition was truncated and needs to be erased
+        ESP_LOGW(TAG, "NVS partition needs to be erased, erasing...");
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize NVS flash: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(TAG, "NVS flash initialized successfully");
+
+    // Initialize LittleFS
     ESP_LOGI(TAG, "Initializing LittleFS");
 
     esp_vfs_littlefs_conf_t conf = {
@@ -18,7 +37,7 @@ esp_err_t storage_manager_init(void)
         .dont_mount = false,
     };
 
-    esp_err_t ret = esp_vfs_littlefs_register(&conf);
+    ret = esp_vfs_littlefs_register(&conf);
 
     if (ret != ESP_OK) {
         if (ret == ESP_FAIL) {

@@ -192,6 +192,21 @@ esp_err_t time_manager_init(void)
         strcpy(g_time_manager.config.timezone, "UTC0");
         g_time_manager.config.auto_sync_enabled = true;
         g_time_manager.config.sync_interval_s = TIME_MANAGER_DEFAULT_SYNC_INTERVAL;
+        
+        ESP_LOGI(TAG, "Using default configuration:");
+        ESP_LOGI(TAG, "  Timezone: %s", g_time_manager.config.timezone);
+        ESP_LOGI(TAG, "  NTP servers: %d configured", g_time_manager.config.ntp_server_count);
+        ESP_LOGI(TAG, "  Auto sync: %s", g_time_manager.config.auto_sync_enabled ? "enabled" : "disabled");
+    } else {
+        ESP_LOGI(TAG, "Loaded configuration from NVS:");
+        ESP_LOGI(TAG, "  Timezone: %s", g_time_manager.config.timezone);
+        ESP_LOGI(TAG, "  NTP servers: %d configured", g_time_manager.config.ntp_server_count);
+        for (uint8_t i = 0; i < g_time_manager.config.ntp_server_count; i++) {
+            ESP_LOGI(TAG, "    Server %d: %s", i, g_time_manager.config.ntp_servers[i]);
+        }
+        ESP_LOGI(TAG, "  Auto sync: %s (interval: %lu s)", 
+                 g_time_manager.config.auto_sync_enabled ? "enabled" : "disabled",
+                 (unsigned long)g_time_manager.config.sync_interval_s);
     }
 
     // Load statistics from NVS
@@ -205,16 +220,8 @@ esp_err_t time_manager_init(void)
     setenv("TZ", g_time_manager.config.timezone, 1);
     tzset();
 
-    // Register WiFi event handler
-    err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &time_manager_wifi_event_handler, NULL);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to register WiFi event handler: %s", esp_err_to_name(err));
-    }
-
-    err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &time_manager_wifi_event_handler, NULL);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to register IP event handler: %s", esp_err_to_name(err));
-    }
+    // WiFi event handlers will be registered separately after WiFi initialization
+    ESP_LOGI(TAG, "WiFi event handlers will be registered after WiFi initialization");
 
     // Create time manager task
     BaseType_t task_created = xTaskCreatePinnedToCore(
@@ -239,6 +246,33 @@ esp_err_t time_manager_init(void)
     g_time_manager.status = TIME_MANAGER_INITIALIZED;
     ESP_LOGI(TAG, "Time management system initialized successfully");
 
+    return ESP_OK;
+}
+
+esp_err_t time_manager_register_wifi_events(void)
+{
+    if (g_time_manager.status == TIME_MANAGER_NOT_INITIALIZED) {
+        ESP_LOGE(TAG, "Cannot register WiFi events: time manager not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Registering WiFi event handlers...");
+
+    // Register WiFi event handler
+    esp_err_t err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &time_manager_wifi_event_handler, NULL);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register WiFi event handler: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &time_manager_wifi_event_handler, NULL);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register IP event handler: %s", esp_err_to_name(err));
+        esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &time_manager_wifi_event_handler);
+        return err;
+    }
+
+    ESP_LOGI(TAG, "WiFi event handlers registered successfully");
     return ESP_OK;
 }
 

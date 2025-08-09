@@ -156,12 +156,20 @@ typedef struct {
  * - PSRAM allocation for timezone database and NTP history
  * - NVS storage initialization for persistent settings
  * - SNTP client configuration
- * - WiFi event handler registration
  * - Time manager task creation
+ * 
+ * Note: WiFi event handlers are registered separately via time_manager_register_wifi_events()
  * 
  * @return ESP_OK on success, error code on failure
  */
 esp_err_t time_manager_init(void);
+
+/**
+ * @brief Register WiFi event handlers (call after WiFi initialization)
+ * 
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t time_manager_register_wifi_events(void);
 
 /**
  * @brief Deinitialize the time manager system

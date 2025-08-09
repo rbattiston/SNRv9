@@ -304,39 +304,12 @@ void app_main(void)
         return;
     }
     
-    // Initialize Time Management System (Step 9 Phase 2)
-    ESP_LOGI(TAG, "Initializing Time Management System...");
-    if (time_manager_init() != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize Time Management System");
-        return;
-    }
-    
-    // Initialize WiFi handler system
-    ESP_LOGI(TAG, "Initializing WiFi handler...");
-    if (!wifi_handler_init()) {
-        ESP_LOGE(TAG, "Failed to initialize WiFi handler");
-        return;
-    }
-    
-    // Initialize authentication manager
-    ESP_LOGI(TAG, "Initializing authentication manager...");
-    if (!auth_manager_init()) {
-        ESP_LOGE(TAG, "Failed to initialize authentication manager");
-        return;
-    }
-    
-    // Initialize web server manager
-    ESP_LOGI(TAG, "Initializing web server manager...");
-    if (!web_server_manager_init()) {
-        ESP_LOGE(TAG, "Failed to initialize web server manager");
-        return;
-    }
-
-    // Initialize storage manager
+    // Initialize storage manager FIRST (required for NVS access)
     ESP_LOGI(TAG, "Initializing storage manager...");
     if (storage_manager_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize storage manager");
-        // Continuing without storage, but functionality will be limited
+        // This is critical for time manager - cannot continue without NVS
+        return;
     } else {
         // Test file operations
         FILE *f = fopen("/littlefs/boot_count.txt", "r+");
@@ -358,6 +331,41 @@ void app_main(void)
             ESP_LOGI(TAG, "Incremented boot count to: %d", count);
             fclose(f);
         }
+    }
+    
+    // Initialize Time Management System (Step 9 Phase 2) - AFTER storage manager
+    ESP_LOGI(TAG, "Initializing Time Management System...");
+    if (time_manager_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize Time Management System");
+        return;
+    }
+    
+    // Initialize WiFi handler system (required for NTP sync)
+    ESP_LOGI(TAG, "Initializing WiFi handler...");
+    if (!wifi_handler_init()) {
+        ESP_LOGE(TAG, "Failed to initialize WiFi handler");
+        return;
+    }
+    
+    // Register time manager WiFi event handlers (after WiFi initialization)
+    ESP_LOGI(TAG, "Registering time manager WiFi event handlers...");
+    if (time_manager_register_wifi_events() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register time manager WiFi event handlers");
+        return;
+    }
+    
+    // Initialize authentication manager
+    ESP_LOGI(TAG, "Initializing authentication manager...");
+    if (!auth_manager_init()) {
+        ESP_LOGE(TAG, "Failed to initialize authentication manager");
+        return;
+    }
+    
+    // Initialize web server manager
+    ESP_LOGI(TAG, "Initializing web server manager...");
+    if (!web_server_manager_init()) {
+        ESP_LOGE(TAG, "Failed to initialize web server manager");
+        return;
     }
     
     // Initialize configuration manager
