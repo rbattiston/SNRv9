@@ -235,7 +235,35 @@ bool static_file_controller_register_handlers(httpd_handle_t server)
         return false;
     }
 
-    ESP_LOGI(TAG, "Static file handlers registered successfully");
+    // Register time_management.html handler
+    httpd_uri_t time_mgmt_html_uri = {
+        .uri = "/time_management.html",
+        .method = HTTP_GET,
+        .handler = file_handler,
+        .user_ctx = NULL
+    };
+
+    ret = httpd_register_uri_handler(server, &time_mgmt_html_uri);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register time_management.html handler: %s", esp_err_to_name(ret));
+        return false;
+    }
+
+    // Register time_management.js handler
+    httpd_uri_t time_mgmt_js_uri = {
+        .uri = "/time_management.js",
+        .method = HTTP_GET,
+        .handler = file_handler,
+        .user_ctx = NULL
+    };
+
+    ret = httpd_register_uri_handler(server, &time_mgmt_js_uri);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register time_management.js handler: %s", esp_err_to_name(ret));
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Static file handlers registered successfully (including Time Management files)");
     return true;
 }
 

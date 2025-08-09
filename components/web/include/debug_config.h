@@ -338,6 +338,79 @@ extern "C" {
  */
 #define DEBUG_PRIORITY_TEST_TAG "PRIORITY_TEST"
 
+/* =============================================================================
+ * TIME MANAGEMENT DEBUG CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief Enable/disable time management system debug output
+ * Set to 1 to enable time manager debugging, 0 to disable
+ */
+#define DEBUG_TIME_MANAGEMENT 1
+
+/**
+ * @brief Enable/disable detailed NTP sync debugging
+ * Set to 1 to log every NTP sync step, 0 for summary only
+ */
+#define DEBUG_NTP_SYNC_DETAILED 1
+
+/**
+ * @brief Enable/disable WiFi event debugging for time system
+ * Set to 1 to log WiFi events affecting time sync, 0 to disable
+ */
+#define DEBUG_TIME_WIFI_EVENTS 1
+
+/**
+ * @brief Enable/disable timezone configuration debugging
+ * Set to 1 to log timezone changes and validation, 0 to disable
+ */
+#define DEBUG_TIMEZONE_CONFIG 1
+
+/**
+ * @brief Enable/disable time reliability state debugging
+ * Set to 1 to log reliability state transitions, 0 to disable
+ */
+#define DEBUG_TIME_RELIABILITY 1
+
+/**
+ * @brief Enable/disable time controller web API debugging
+ * Set to 1 to log detailed API request/response flow, 0 to disable
+ */
+#define DEBUG_TIME_CONTROLLER 1
+
+/**
+ * @brief Enable/disable SNTP callback debugging
+ * Set to 1 to log SNTP sync callbacks and results, 0 to disable
+ */
+#define DEBUG_SNTP_CALLBACKS 1
+
+/**
+ * @brief Enable/disable time manager task debugging
+ * Set to 1 to log time manager task loop decisions, 0 to disable
+ */
+#define DEBUG_TIME_MANAGER_TASK 1
+
+/**
+ * @brief Time management status report interval in milliseconds
+ * How often to output time management status to serial
+ */
+#define DEBUG_TIME_REPORT_INTERVAL_MS 30000
+
+/**
+ * @brief Debug output tag for time management
+ */
+#define DEBUG_TIME_MANAGEMENT_TAG "TIME_MGR"
+
+/**
+ * @brief Debug output tag for time controller
+ */
+#define DEBUG_TIME_CONTROLLER_TAG "TIME_CTRL"
+
+/**
+ * @brief Debug output tag for SNTP operations
+ */
+#define DEBUG_SNTP_TAG "SNTP"
 
 #ifdef __cplusplus
 }

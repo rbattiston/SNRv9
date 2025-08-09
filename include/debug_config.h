@@ -160,6 +160,80 @@ extern "C" {
 #define DEBUG_DATA_LOGGING 0
 
 /* =============================================================================
+ * TIME MANAGEMENT DEBUG CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief Enable/disable time management system debug output
+ * Set to 1 to enable time manager debugging, 0 to disable
+ */
+#define DEBUG_TIME_MANAGEMENT 1
+
+/**
+ * @brief Enable/disable detailed NTP sync debugging
+ * Set to 1 to log every NTP sync step, 0 for summary only
+ */
+#define DEBUG_NTP_SYNC_DETAILED 1
+
+/**
+ * @brief Enable/disable WiFi event debugging for time system
+ * Set to 1 to log WiFi events affecting time sync, 0 to disable
+ */
+#define DEBUG_TIME_WIFI_EVENTS 1
+
+/**
+ * @brief Enable/disable timezone configuration debugging
+ * Set to 1 to log timezone changes and validation, 0 to disable
+ */
+#define DEBUG_TIMEZONE_CONFIG 1
+
+/**
+ * @brief Enable/disable time reliability state debugging
+ * Set to 1 to log reliability state transitions, 0 to disable
+ */
+#define DEBUG_TIME_RELIABILITY 1
+
+/**
+ * @brief Enable/disable time controller web API debugging
+ * Set to 1 to log detailed API request/response flow, 0 to disable
+ */
+#define DEBUG_TIME_CONTROLLER 1
+
+/**
+ * @brief Enable/disable SNTP callback debugging
+ * Set to 1 to log SNTP sync callbacks and results, 0 to disable
+ */
+#define DEBUG_SNTP_CALLBACKS 1
+
+/**
+ * @brief Enable/disable time manager task debugging
+ * Set to 1 to log time manager task loop decisions, 0 to disable
+ */
+#define DEBUG_TIME_MANAGER_TASK 1
+
+/**
+ * @brief Time management status report interval in milliseconds
+ * How often to output time management status to serial
+ */
+#define DEBUG_TIME_REPORT_INTERVAL_MS 30000
+
+/**
+ * @brief Debug output tag for time management
+ */
+#define DEBUG_TIME_MANAGEMENT_TAG "TIME_MGR"
+
+/**
+ * @brief Debug output tag for time controller
+ */
+#define DEBUG_TIME_CONTROLLER_TAG "TIME_CTRL"
+
+/**
+ * @brief Debug output tag for SNTP operations
+ */
+#define DEBUG_SNTP_TAG "SNTP"
+
+/* =============================================================================
  * REQUEST PRIORITY MANAGEMENT DEBUG CONFIGURATION
  * =============================================================================
  */
@@ -560,6 +634,88 @@ extern "C" {
  * @brief Debug output tag for PSRAM safety
  */
 #define DEBUG_PSRAM_SAFETY_TAG "PSRAM_SAFETY"
+
+/* =============================================================================
+ * STEP 9 ADVANCED FEATURES DEBUG CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief Enable/disable Time Management System debug output
+ * Set to 1 to enable time management debugging, 0 to disable
+ */
+#define DEBUG_TIME_MANAGEMENT 1
+
+/**
+ * @brief Enable/disable Scheduling System debug output
+ * Set to 1 to enable scheduling system debugging, 0 to disable
+ */
+#define DEBUG_SCHEDULING_SYSTEM 1
+
+/**
+ * @brief Enable/disable Alarming System debug output
+ * Set to 1 to enable alarming system debugging, 0 to disable
+ */
+#define DEBUG_ALARMING_SYSTEM 1
+
+/**
+ * @brief Enable/disable Trending System debug output
+ * Set to 1 to enable trending system debugging, 0 to disable
+ */
+#define DEBUG_TRENDING_SYSTEM 1
+
+/**
+ * @brief Enable/disable Step 9 PSRAM usage debugging
+ * Set to 1 to enable Step 9 PSRAM allocation debugging, 0 to disable
+ */
+#define DEBUG_STEP9_PSRAM_USAGE 1
+
+/* =============================================================================
+ * STEP 9 TIMING CONFIGURATION
+ * =============================================================================
+ */
+
+/**
+ * @brief Step 9 monitoring interval in milliseconds
+ * How often to output Step 9 system status to serial
+ */
+#define DEBUG_STEP9_MONITORING_INTERVAL_MS 60000
+
+/**
+ * @brief Enable/disable detailed Step 9 logging
+ * Set to 1 for detailed operation logging, 0 for summary only
+ */
+#define DEBUG_STEP9_DETAILED_LOGGING 1
+
+/* =============================================================================
+ * STEP 9 OUTPUT TAGS
+ * =============================================================================
+ */
+
+/**
+ * @brief Debug output tag for Time Management System
+ */
+#define DEBUG_TIME_MANAGEMENT_TAG "TIME_MGR"
+
+/**
+ * @brief Debug output tag for Scheduling System
+ */
+#define DEBUG_SCHEDULING_SYSTEM_TAG "SCHEDULE"
+
+/**
+ * @brief Debug output tag for Alarming System
+ */
+#define DEBUG_ALARMING_SYSTEM_TAG "ALARM"
+
+/**
+ * @brief Debug output tag for Trending System
+ */
+#define DEBUG_TRENDING_SYSTEM_TAG "TRENDING"
+
+/**
+ * @brief Debug output tag for Step 9 PSRAM usage
+ */
+#define DEBUG_STEP9_PSRAM_TAG "STEP9_PSRAM"
 
 #ifdef __cplusplus
 }

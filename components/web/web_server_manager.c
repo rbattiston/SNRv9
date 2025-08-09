@@ -7,6 +7,7 @@
 #include "auth_controller.h"
 #include "system_controller.h"
 #include "io_test_controller.h"
+#include "time_controller.h"
 #include "task_tracker.h"
 #include "debug_config.h"
 #include "esp_log.h"
@@ -163,6 +164,15 @@ bool web_server_manager_start(void)
     // Initialize system controller (specific /api/system/* routes)
     if (!system_controller_init(g_web_server.server_handle)) {
         ESP_LOGE(TAG, "Failed to initialize system controller");
+        httpd_stop(g_web_server.server_handle);
+        g_web_server.server_handle = NULL;
+        g_web_server.status = WEB_SERVER_ERROR;
+        return false;
+    }
+
+    // Initialize time controller (specific /api/time/* routes)
+    if (!time_controller_init(g_web_server.server_handle)) {
+        ESP_LOGE(TAG, "Failed to initialize time controller");
         httpd_stop(g_web_server.server_handle);
         g_web_server.server_handle = NULL;
         g_web_server.status = WEB_SERVER_ERROR;

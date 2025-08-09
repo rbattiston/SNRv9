@@ -50,6 +50,7 @@ typedef struct {
     psram_info_t info;
     SemaphoreHandle_t mutex;
     uint32_t last_health_check;
+    bool step9_extended;                /**< True if Step 9 extensions are initialized */
 } psram_manager_context_t;
 
 /* =============================================================================
@@ -697,4 +698,286 @@ static uint8_t calculate_usage_percent(size_t used, size_t total)
         return 0;
     }
     return (uint8_t)((used * 100) / total);
+}
+
+/* =============================================================================
+ * STEP 9 ADVANCED FEATURES IMPLEMENTATIONS
+ * =============================================================================
+ */
+
+esp_err_t psram_manager_extend_for_step9(void)
+{
+    if (!g_psram_ctx.initialized) {
+        ESP_LOGE(TAG, "PSRAM manager not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (xSemaphoreTake(g_psram_ctx.mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (g_psram_ctx.step9_extended) {
+            ESP_LOGW(TAG, "Step 9 extensions already initialized");
+            xSemaphoreGive(g_psram_ctx.mutex);
+            return ESP_OK;
+        }
+
+        // Initialize Step 9 category tracking
+        g_psram_ctx.info.time_mgmt_bytes = 0;
+        g_psram_ctx.info.scheduling_bytes = 0;
+        g_psram_ctx.info.alarming_bytes = 0;
+        g_psram_ctx.info.trending_bytes = 0;
+        g_psram_ctx.info.web_buffer_bytes = 0;
+        
+        g_psram_ctx.info.time_mgmt_allocations = 0;
+        g_psram_ctx.info.scheduling_allocations = 0;
+        g_psram_ctx.info.alarming_allocations = 0;
+        g_psram_ctx.info.trending_allocations = 0;
+        g_psram_ctx.info.web_buffer_allocations = 0;
+
+        g_psram_ctx.step9_extended = true;
+        
+        xSemaphoreGive(g_psram_ctx.mutex);
+        
+        ESP_LOGI(TAG, "Step 9 PSRAM extensions initialized successfully");
+        return ESP_OK;
+    }
+
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t psram_manager_allocate_for_category(psram_allocation_strategy_t category, 
+                                             size_t size, void** ptr)
+{
+    if (ptr == NULL || size == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!g_psram_ctx.initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (!g_psram_ctx.step9_extended) {
+        ESP_LOGW(TAG, "Step 9 extensions not initialized, initializing now");
+        esp_err_t err = psram_manager_extend_for_step9();
+        if (err != ESP_OK) {
+            return err;
+        }
+    }
+
+    *ptr = NULL;
+
+    if (xSemaphoreTake(g_psram_ctx.mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // Try to allocate in PSRAM first for Step 9 categories
+        if (g_psram_ctx.enabled && category >= PSRAM_ALLOC_TIME_MGMT) {
+            *ptr = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+            
+            if (*ptr) {
+                // Update category-specific tracking
+                switch (category) {
+                    case PSRAM_ALLOC_TIME_MGMT:
+                        g_psram_ctx.info.time_mgmt_bytes += size;
+                        g_psram_ctx.info.time_mgmt_allocations++;
+                        ESP_LOGI(TAG, "Time Management allocation: %zu bytes in PSRAM", size);
+                        break;
+                    case PSRAM_ALLOC_SCHEDULING:
+                        g_psram_ctx.info.scheduling_bytes += size;
+                        g_psram_ctx.info.scheduling_allocations++;
+                        ESP_LOGI(TAG, "Scheduling allocation: %zu bytes in PSRAM", size);
+                        break;
+                    case PSRAM_ALLOC_ALARMING:
+                        g_psram_ctx.info.alarming_bytes += size;
+                        g_psram_ctx.info.alarming_allocations++;
+                        ESP_LOGI(TAG, "Alarming allocation: %zu bytes in PSRAM", size);
+                        break;
+                    case PSRAM_ALLOC_TRENDING:
+                        g_psram_ctx.info.trending_bytes += size;
+                        g_psram_ctx.info.trending_allocations++;
+                        ESP_LOGI(TAG, "Trending allocation: %zu bytes in PSRAM", size);
+                        break;
+                    case PSRAM_ALLOC_WEB_BUFFERS:
+                        g_psram_ctx.info.web_buffer_bytes += size;
+                        g_psram_ctx.info.web_buffer_allocations++;
+                        ESP_LOGI(TAG, "Web Buffer allocation: %zu bytes in PSRAM", size);
+                        break;
+                    default:
+                        ESP_LOGW(TAG, "Unknown Step 9 category: %d", category);
+                        break;
+                }
+                
+                g_psram_ctx.info.psram_allocations++;
+                xSemaphoreGive(g_psram_ctx.mutex);
+                return ESP_OK;
+            } else {
+                g_psram_ctx.info.psram_failures++;
+                ESP_LOGW(TAG, "PSRAM allocation failed for category %d, trying fallback", category);
+                
+                // Try fallback to internal RAM for smaller allocations
+                if (size < PSRAM_LARGE_ALLOCATION_THRESHOLD) {
+                    *ptr = heap_caps_malloc(size, MALLOC_CAP_INTERNAL);
+                    if (*ptr) {
+                        g_psram_ctx.info.fallback_allocations++;
+                        ESP_LOGW(TAG, "Fallback allocation: %zu bytes in internal RAM for category %d", size, category);
+                        xSemaphoreGive(g_psram_ctx.mutex);
+                        return ESP_OK;
+                    }
+                }
+            }
+        } else {
+            ESP_LOGE(TAG, "PSRAM not available or invalid category");
+        }
+        
+        xSemaphoreGive(g_psram_ctx.mutex);
+    }
+
+    return ESP_ERR_NO_MEM;
+}
+
+esp_err_t psram_manager_get_category_usage(psram_allocation_strategy_t category, 
+                                          size_t* used, size_t* allocated)
+{
+    if (used == NULL || allocated == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!g_psram_ctx.initialized || !g_psram_ctx.step9_extended) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (xSemaphoreTake(g_psram_ctx.mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        switch (category) {
+            case PSRAM_ALLOC_TIME_MGMT:
+                *used = g_psram_ctx.info.time_mgmt_bytes;
+                *allocated = g_psram_ctx.info.time_mgmt_allocations;
+                break;
+            case PSRAM_ALLOC_SCHEDULING:
+                *used = g_psram_ctx.info.scheduling_bytes;
+                *allocated = g_psram_ctx.info.scheduling_allocations;
+                break;
+            case PSRAM_ALLOC_ALARMING:
+                *used = g_psram_ctx.info.alarming_bytes;
+                *allocated = g_psram_ctx.info.alarming_allocations;
+                break;
+            case PSRAM_ALLOC_TRENDING:
+                *used = g_psram_ctx.info.trending_bytes;
+                *allocated = g_psram_ctx.info.trending_allocations;
+                break;
+            case PSRAM_ALLOC_WEB_BUFFERS:
+                *used = g_psram_ctx.info.web_buffer_bytes;
+                *allocated = g_psram_ctx.info.web_buffer_allocations;
+                break;
+            default:
+                xSemaphoreGive(g_psram_ctx.mutex);
+                return ESP_ERR_INVALID_ARG;
+        }
+        
+        xSemaphoreGive(g_psram_ctx.mutex);
+        return ESP_OK;
+    }
+
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t psram_manager_get_step9_status(psram_step9_status_t* status)
+{
+    if (status == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!g_psram_ctx.initialized || !g_psram_ctx.step9_extended) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (xSemaphoreTake(g_psram_ctx.mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // Category usage
+        status->time_mgmt_used = g_psram_ctx.info.time_mgmt_bytes;
+        status->scheduling_used = g_psram_ctx.info.scheduling_bytes;
+        status->alarming_used = g_psram_ctx.info.alarming_bytes;
+        status->trending_used = g_psram_ctx.info.trending_bytes;
+        status->web_buffer_used = g_psram_ctx.info.web_buffer_bytes;
+        
+        // Category allocation counts
+        status->time_mgmt_count = g_psram_ctx.info.time_mgmt_allocations;
+        status->scheduling_count = g_psram_ctx.info.scheduling_allocations;
+        status->alarming_count = g_psram_ctx.info.alarming_allocations;
+        status->trending_count = g_psram_ctx.info.trending_allocations;
+        status->web_buffer_count = g_psram_ctx.info.web_buffer_allocations;
+        
+        // Total Step 9 usage
+        status->total_step9_bytes = status->time_mgmt_used + status->scheduling_used + 
+                                   status->alarming_used + status->trending_used + 
+                                   status->web_buffer_used;
+        status->total_step9_allocations = status->time_mgmt_count + status->scheduling_count + 
+                                         status->alarming_count + status->trending_count + 
+                                         status->web_buffer_count;
+        
+        status->timestamp_ms = GET_TIMESTAMP();
+        
+        xSemaphoreGive(g_psram_ctx.mutex);
+        return ESP_OK;
+    }
+
+    return ESP_ERR_TIMEOUT;
+}
+
+void psram_manager_print_step9_report(void)
+{
+    if (!g_psram_ctx.initialized || !g_psram_ctx.step9_extended) {
+        printf(TIMESTAMP_FORMAT "%s: Step 9 extensions not initialized\n", 
+               FORMAT_TIMESTAMP(GET_TIMESTAMP()), TAG);
+        return;
+    }
+
+    psram_step9_status_t status;
+    if (psram_manager_get_step9_status(&status) != ESP_OK) {
+        printf(TIMESTAMP_FORMAT "%s: Failed to get Step 9 status\n", 
+               FORMAT_TIMESTAMP(GET_TIMESTAMP()), TAG);
+        return;
+    }
+
+    char buffer[32];
+    uint32_t timestamp = GET_TIMESTAMP();
+
+    printf(TIMESTAMP_FORMAT "%s: === STEP 9 PSRAM USAGE REPORT ===\n", 
+           FORMAT_TIMESTAMP(timestamp), TAG);
+
+    // Category breakdown
+    printf(TIMESTAMP_FORMAT "%s: Time Management: %s (%u allocations)\n",
+           FORMAT_TIMESTAMP(timestamp), TAG,
+           format_bytes(status.time_mgmt_used, buffer, sizeof(buffer)),
+           (unsigned int)status.time_mgmt_count);
+
+    printf(TIMESTAMP_FORMAT "%s: Scheduling: %s (%u allocations)\n",
+           FORMAT_TIMESTAMP(timestamp), TAG,
+           format_bytes(status.scheduling_used, buffer, sizeof(buffer)),
+           (unsigned int)status.scheduling_count);
+
+    printf(TIMESTAMP_FORMAT "%s: Alarming: %s (%u allocations)\n",
+           FORMAT_TIMESTAMP(timestamp), TAG,
+           format_bytes(status.alarming_used, buffer, sizeof(buffer)),
+           (unsigned int)status.alarming_count);
+
+    printf(TIMESTAMP_FORMAT "%s: Trending: %s (%u allocations)\n",
+           FORMAT_TIMESTAMP(timestamp), TAG,
+           format_bytes(status.trending_used, buffer, sizeof(buffer)),
+           (unsigned int)status.trending_count);
+
+    printf(TIMESTAMP_FORMAT "%s: Web Buffers: %s (%u allocations)\n",
+           FORMAT_TIMESTAMP(timestamp), TAG,
+           format_bytes(status.web_buffer_used, buffer, sizeof(buffer)),
+           (unsigned int)status.web_buffer_count);
+
+    // Total Step 9 usage
+    printf(TIMESTAMP_FORMAT "%s: Total Step 9: %s (%u allocations)\n",
+           FORMAT_TIMESTAMP(timestamp), TAG,
+           format_bytes(status.total_step9_bytes, buffer, sizeof(buffer)),
+           (unsigned int)status.total_step9_allocations);
+
+    // Calculate percentage of total PSRAM
+    if (g_psram_ctx.info.psram_available && g_psram_ctx.info.psram_total_size > 0) {
+        uint8_t step9_percent = calculate_usage_percent(status.total_step9_bytes, 
+                                                       g_psram_ctx.info.psram_total_size);
+        printf(TIMESTAMP_FORMAT "%s: Step 9 PSRAM Usage: %u%% of total PSRAM\n",
+               FORMAT_TIMESTAMP(timestamp), TAG, step9_percent);
+    }
+
+    printf(TIMESTAMP_FORMAT "%s: ===================================\n", 
+           FORMAT_TIMESTAMP(timestamp), TAG);
 }

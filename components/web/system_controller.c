@@ -6,6 +6,7 @@
 #include "system_controller.h"
 #include "memory_monitor.h"
 #include "task_tracker.h"
+#include "psram_manager.h"
 #include "wifi_handler.h"
 #include "auth_manager.h"
 #include "web_server_manager.h"

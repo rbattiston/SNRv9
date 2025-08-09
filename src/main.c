@@ -30,6 +30,7 @@
 #include "request_priority_manager.h"
 #include "request_queue.h"
 #include "request_priority_test_suite.h"
+#include "time_manager.h"
 
 static const char *TAG = "SNRv9_MAIN";
 
@@ -293,6 +294,20 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing PSRAM manager...");
     if (!psram_manager_init()) {
         ESP_LOGE(TAG, "Failed to initialize PSRAM manager");
+        return;
+    }
+    
+    // Extend PSRAM manager for Step 9 features
+    ESP_LOGI(TAG, "Extending PSRAM manager for Step 9 features...");
+    if (psram_manager_extend_for_step9() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to extend PSRAM manager for Step 9");
+        return;
+    }
+    
+    // Initialize Time Management System (Step 9 Phase 2)
+    ESP_LOGI(TAG, "Initializing Time Management System...");
+    if (time_manager_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize Time Management System");
         return;
     }
     

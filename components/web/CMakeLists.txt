@@ -7,6 +7,7 @@ idf_component_register(
          "request_priority_manager.c"
          "request_queue.c"
          "request_priority_test_suite.c"
+         "time_controller.c"
     INCLUDE_DIRS "include"
     REQUIRES "esp_http_server" "esp_littlefs" "json" "core" "storage" "network" "esp_timer" "esp_system" "esp_wifi"
 )

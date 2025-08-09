@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "memory_monitor.c"
+    SRCS "time_manager.c" "memory_monitor.c"
          "task_tracker.c"
          "psram_manager.c"
          "psram_task_examples.c"
@@ -16,5 +16,10 @@ idf_component_register(
              "driver"
              "esp_adc"
              "storage"
+             "lwip"
+             "esp_netif"
+             "esp_wifi"
+             "nvs_flash"
+             "esp_event"
     PRIV_REQUIRES "storage"
 )
